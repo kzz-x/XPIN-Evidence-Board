@@ -1,0 +1,25 @@
+:root { font-family:Inter,"Microsoft YaHei",system-ui,sans-serif; color:#e6e5e1; background:#151618; }
+* { box-sizing:border-box; }
+body { margin:0; }
+#app { height:100vh; display:flex; flex-direction:column; min-height:600px; }
+.header { height:60px; border-bottom:1px solid #34373b; display:flex; align-items:center; justify-content:space-between; padding:0 22px; background:#1d1f22; }
+.brand { font-size:16px; font-weight:700; display:flex; align-items:center; gap:12px; }
+.logo { display:inline-flex; align-items:center; justify-content:center; border:1px solid #99907c; width:27px; height:27px; border-radius:7px; color:#dacaa7; }
+.sub { color:#999b9e; letter-spacing:1.8px; font-size:10px; font-weight:400; }
+.status { font-size:12px; color:#b8a987; }
+.workspace { display:grid; grid-template-columns:238px minmax(300px,1fr) 244px; flex:1; min-height:0; }
+.panel { background:#202225; padding:20px; border-right:1px solid #35373a; }
+.panel:last-child { border-left:1px solid #35373a; border-right:0; }
+.panel h2 { font-size:14px; margin:0 0 12px; }
+.panel p { font-size:12px; color:#91959c; }
+.placeholder { padding:22px 12px; margin-top:22px; border:1px dashed #494d52; border-radius:10px; color:#707780; text-align:center; font-size:12px; line-height:2; }
+.stage { position:relative; overflow:hidden; background-color:#292b2c; background-image:radial-gradient(#414346 0.8px, transparent 0.8px); background-size:20px 20px; }
+.stage-label { position:absolute; top:20px; left:20px; font-size:12px; color:#979da5; }
+.stage-center { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); text-align:center; min-width:320px; }
+.stage-center span { font-size:12px; letter-spacing:9px; color:#a9997e; }
+.stage-center h1 { font-size:42px; margin:10px 0; font-weight:600; letter-spacing:-1px; }
+.stage-center p { font-size:13px; color:#9a9da0; }
+.timeline { height:125px; border-top:1px solid #393c3f; background:#202124; padding:20px 24px; display:flex; align-items:flex-start; gap:28px; font-size:13px; }
+.timeline-hint { color:#8f959c; flex:1; }
+.timeline span { font-variant-numeric:tabular-nums; color:#a7a8a8; }
+@media(max-width:900px) { .workspace { grid-template-columns:155px minmax(200px,1fr) 165px; } .panel { padding:12px; } .sub { display:none; } .stage-center h1 { font-size:27px; } }
