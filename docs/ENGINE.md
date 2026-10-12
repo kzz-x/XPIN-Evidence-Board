@@ -37,3 +37,16 @@ type Shot = { id:string; label:string; durationMs:number; targetIds?:string[]; c
 
 ## 质量边界
 1080p 桌面 Chrome/Edge 为主要验收环境；性能优化优先缓存/裁剪，不牺牲物件绑定。需测试世界/屏幕精度、旋转组、图钉多连接、复制/撤销/重开、随机时间 seek、播放暂停、输出画幅及实际文件。外部依赖固定版本并尽量可离线运行。
+
+## Three3D 真实渲染与 Lookdev 增补（2026-10-12）
+
+以 `prototypes/XPIN-Evidence-Board-True3D-V2.html` 为迁移基线，选用一个正式、可实际运行的 3D 渲染入口（如 Three.js）；原 `src/main.ts` 只是占位，不可把迁移写成已完成。
+
+- 场景数据与渲染资源分离：SceneObject 保留稳定 ID、父级/宿主局部锚点与 Z，Camera 使用真实 3D pose；同一场景支持编辑与输出。
+- Light 是可选/可复制/可保存的实体：`id | type | position3D | target:{objectId?,localPoint3D?,worldPoint3D?} | intensity | color | cone | penumbra | distance | shadow | enabled`。LightCue 是故事的一种时间事件，参数可插值，随任意 `t` 重算，不依赖点击顺序或上一次渲染的中间态。
+- 物件与绳索具有三维几何和材质受光属性，可投/接影；光源目标移动、模块宿主运动、相机运动不应破坏世界与局部关联。背板和纸张必须接收真实阴影。软件后备能力另行显式标识。
+- 红绳仍由 `fromPinId/toPinId` 确定锚点，几何/表面纹理/投影可缓存，但几何更新与绳端坐标应保持正确。多个引用同一图钉的连接必须独立工作。
+- 工程序列化包括：渲染预设版本、每盏灯参数、聚光目标绑定、LightCue、绳材料与路径参数、环境光、相机焦点和渲染质量。旧版 V2 JSON 使用非破坏性迁移/兼容策略。
+- 输出采用播放模式的**同一** 3D 渲染结果，而非单独二维画布快照。GPU 运行/ShadowMap/景深后处理/下载文件分别实测。
+
+视觉与交互验收见 [LOOKDEV.md](LOOKDEV.md) 与 [ACCEPTANCE.md](ACCEPTANCE.md)。
