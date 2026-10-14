@@ -670,6 +670,8 @@ export class BoardRenderer {
         light.map = cookie.texture;
       } else light.map = null;
       light.castShadow = l.shadow || Boolean(gobo);
+      // Cookie projection needs the shadow camera, while occlusion can still be disabled independently.
+      light.shadow.intensity = l.shadow ? 1 : 0;
       const spotSize =
         settings.quality === "draft"
           ? 1024
