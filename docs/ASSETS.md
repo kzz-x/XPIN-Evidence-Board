@@ -2,6 +2,8 @@
 
 本项目不上传本地图片、音频或工程。发行单文件中已内嵌以下演示资产。
 
+V4 的窗格/百叶/树影为本地代码生成的 SpotLight 投影片，参考 [Three.js SpotLight.map](https://threejs.org/docs/pages/SpotLight.html)。多采样后处理使用 [WebGLRenderTarget](https://threejs.org/docs/pages/WebGLRenderTarget.html)；本机字体 API 参考 [Chrome Local Font Access](https://developer.chrome.com/docs/capabilities/web-apis/local-fonts)。录制停止后索引封装使用 [Mediabunny copy conversion](https://mediabunny.dev/guide/converting-media-files)。使用已锁定的库版本，不因在线文档变化自动升级。
+
 ## 软木 PBR
 
 - [ambientCG Cork003](https://ambientcg.com/view?id=Cork003)，Color、NormalGL、Roughness，1K JPG。

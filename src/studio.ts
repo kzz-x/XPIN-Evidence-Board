@@ -1,3 +1,17 @@
+import "./v4.css";
+import { compileScene } from "./compose";
+import {
+  upgrade,
+  fonts,
+  applyCinemaLook,
+  animationOptions,
+  annotation,
+  sunlight,
+  boardFit,
+  boardPose,
+  type Brush,
+} from "./cinema";
+import { LiveRecorder } from "./record";
 import * as T from "three";
 import { BoardRenderer } from "./renderer";
 import { Store, autosave, download, fileData } from "./store";
@@ -86,6 +100,10 @@ export class Studio {
   fps = 0;
   frames = 0;
   busy = false;
+  fonts = [...fonts];
+  brush = { type: "ink" as Brush, radius: 0.008, color: "#a8212a" };
+  liveRecording = false;
+  recorder?: LiveRecorder;
   private inspectorDetails = new Map<string, boolean>();
   private displayedPanel = "";
   private savedTimer = 0;
@@ -97,8 +115,51 @@ export class Studio {
     public root: HTMLElement,
     p: Project,
   ) {
+    p = upgrade(p);
     this.store = new Store(p);
+    try {
+      const catalog = JSON.parse(
+        document.getElementById("xpin-local-fonts")?.textContent ?? "null",
+      );
+      if (catalog?.format === "xpin-fonts/1" && Array.isArray(catalog.families))
+        this.fonts = [
+          ...new Set([
+            ...this.fonts,
+            ...catalog.families.filter((f: unknown) => typeof f === "string"),
+          ]),
+        ];
+    } catch {}
     this.shell();
+    this.root.insertAdjacentHTML(
+      "beforeend",
+      '<input type="file" id="font-file" accept=".json" hidden>',
+    );
+    this.el<HTMLInputElement>("#font-file").onchange = async (e) => {
+      const input = e.target as HTMLInputElement,
+        file = input.files?.[0];
+      if (!file) return;
+      try {
+        const data = JSON.parse((await file.text()).replace(/^\uFEFF/, ""));
+        if (
+          data.format !== "xpin-fonts/1" ||
+          !Array.isArray(data.families) ||
+          !data.families.every(
+            (f: unknown) => typeof f === "string" && f.length < 200,
+          )
+        )
+          throw Error("不是有效字体清单");
+        this.fonts = [...new Set([...this.fonts, ...data.families])].sort();
+        this.renderInspector();
+        this.toast(`已导入 ${data.families.length} 种本机字体`);
+      } catch (e) {
+        this.toast(String(e));
+      }
+      input.value = "";
+    };
+    this.el(".top-actions").insertAdjacentHTML(
+      "afterbegin",
+      button("停止录制", "record-stop-top", "film"),
+    );
     this.el(".export-options").insertAdjacentHTML(
       "beforeend",
       '<label class="field"><span>视频格式</span><select id="export-format"><option value="webm">WebM / VP9</option><option value="mp4">MP4 / H.264</option></select></label>',
@@ -106,6 +167,15 @@ export class Studio {
     this.el('[data-action="video"] span').textContent = "逐帧视频";
     this.el("#export-note").textContent =
       "使用固定时间戳逐帧编码，不依赖实时录屏速度。支持 MP4 / WebM。";
+    this.recorder = new LiveRecorder(this);
+    this.el(".export-options").insertAdjacentHTML(
+      "beforeend",
+      `<label class="field"><span>输出质量</span><select id="export-quality"><option value="preview">快速预览 / 1×</option><option value="studio" selected>影棚 / MSAA / 高码率</option><option value="master">精制 / 2× 超采样 / 最高码率</option></select></label>`,
+    );
+    this.el(".dialog-actions").insertAdjacentHTML(
+      "afterend",
+      `<div class="record-box"><h3>现场录制</h3><p>记录当前画面与手动运镜，包含已导入音轨。停止后下载 WebM。</p><div class="button-grid">${button("开始录制", "record-start", "film")}${button("停止并保存", "record-stop", "save")}</div><output id="record-status">未录制</output></div>`,
+    );
     this.view = new BoardRenderer(this.el("#viewport"), p.camera);
     this.ready = this.view.sync(p);
     this.renderLibrary();
@@ -133,6 +203,7 @@ export class Studio {
         studio: this,
         ready: this.ready,
         project: () => clone(this.p),
+        compile: compileScene,
         evaluate: (t: number) => evaluate(this.p, t),
         audit: () => this.view.audit(),
         select: (ids: string[]) => this.select(ids),
@@ -163,7 +234,7 @@ export class Studio {
  <main id="stage" class="stage"><div id="viewport" class="viewport"></div><div id="loading">正在建立三维档案室…</div><div class="stage-caption"><span class="tiny-dot"></span><span>CASE 047 / THE MIDNIGHT ARCHIVE</span></div><div class="stage-top-right"><span id="render-status">真实三维 / WebGL2</span><button data-action="helpers" class="icon-button" title="显示或隐藏灯光辅助">${icon("light")}</button></div><div class="tools" aria-label="搭建工具">${(["select", "rotate", "scale", "pin", "rope", "mark", "light", "target"] as Tool[]).map((t, i) => `<button data-tool="${t}" title="${["移动 / V", "旋转 / R", "缩放 / E", "图钉 / P", "拉绳 / C", "手绘 / M", "添加追光 / L", "指定追光落点"][i]}" class="${!i ? "active" : ""}">${icon(t === "select" ? "move" : t === "target" ? "focus" : t)}</button>`).join("")}<hr>${button("全览", "fit", "grid", "icon-button")}${button("特写", "focus", "focus", "icon-button")}</div><div class="stage-bottom"><div id="hint" class="interaction-hint">拖动摆放 · 滚轮缩放 · Alt 拖动环视 · 空格平移</div><div class="view-pill"><button data-action="front">正视</button><button data-action="angle">斜视</button><span id="fps">—</span></div></div><div id="box-select" class="box-select" hidden></div><div id="drop-preview" class="drop-preview" hidden>释放以放置模块</div><div id="toast" class="toast" role="status"></div></main>
  <aside class="inspector-panel"><div class="inspector-tabs"><button data-panel="object" class="active">物件</button><button data-panel="light">布光</button><button data-panel="scene">场景</button><button data-panel="shot">镜头</button></div><div id="inspector"></div></aside></div>
  <footer class="timeline"><div class="timeline-head"><div><small>STORY SEQUENCE</small><b>故事编排</b></div><button data-action="play" class="play-button" id="play-button">${icon("play")}播放故事</button><button data-action="reset" class="icon-button" title="回到开始">↤</button><input id="scrub" type="range" min="0" max="20" step="0.001" value="0" aria-label="播放头"><span id="timecode">00:00.00 / 00:20</span>${button("加入镜头", "shot", "plus")}</div><div id="shots" class="shots"></div></footer>
- <dialog id="output-dialog"><div class="dialog-head"><div><small>DELIVER YOUR STORY</small><h2>输出作品</h2></div><button data-action="close-dialog" class="icon-button">${icon("close")}</button></div><p>与当前三维画面使用同一场景、灯光、景深和时间轴。输出隐藏编辑辅助。</p><div class="export-options"><label class="field"><span>分辨率</span><select id="export-size"><option value="1920">1080p / 长边 1920</option><option value="2560">1440p / 长边 2560</option><option value="3840">4K / 长边 3840</option></select></label><label class="field"><span>视频帧率</span><select id="export-fps"><option value="24">24 fps</option><option value="30">30 fps</option></select></label></div><div class="dialog-actions">${button("当前帧 PNG", "png", "photo", "primary")}${button("故事视频 WebM", "video", "film")}</div><progress id="export-progress" value="0" max="1" hidden></progress><p class="helper" id="export-note">VP9 / VP8 WebM。声音可在场景面板导入。工程 JSON 内嵌素材。</p></dialog><input type="file" id="project-file" accept=".json" hidden><input type="file" id="image-file" accept="image/png,image/jpeg,image/webp,image/svg+xml" hidden><input type="file" id="audio-file" accept="audio/*" hidden>`;
+ <dialog id="output-dialog"><div class="dialog-head"><div><small>DELIVER YOUR STORY</small><h2>输出作品</h2></div><button data-action="close-dialog" class="icon-button">${icon("close")}</button></div><p>与当前三维画面使用同一场景、灯光、景深和时间轴。输出隐藏编辑辅助。</p><div class="export-options"><label class="field"><span>分辨率</span><select id="export-size"><option value="1920">1080p / 长边 1920</option><option value="2560">1440p / 长边 2560</option><option value="3840">4K / 长边 3840</option></select></label><label class="field"><span>视频帧率</span><select id="export-fps"><option value="24">24 fps</option><option value="30">30 fps</option><option value="60">60 fps</option></select></label></div><div class="dialog-actions">${button("当前帧 PNG", "png", "photo", "primary")}${button("故事视频 WebM", "video", "film")}</div><progress id="export-progress" value="0" max="1" hidden></progress><p class="helper" id="export-note">VP9 / VP8 WebM。声音可在场景面板导入。工程 JSON 内嵌素材。</p></dialog><input type="file" id="project-file" accept=".json" hidden><input type="file" id="image-file" accept="image/png,image/jpeg,image/webp,image/svg+xml" hidden><input type="file" id="audio-file" accept="audio/*" hidden>`;
   }
   renderLibrary() {
     this.el("#categories").innerHTML = categories
@@ -212,6 +283,13 @@ export class Studio {
     this.el("#library").innerHTML = html || '<p class="empty">没有找到模块</p>';
   }
   renderInspector() {
+    this.fonts = [
+      ...new Set([
+        ...this.fonts,
+        this.p.settings.font,
+        ...this.p.items.map((o) => o.font ?? "").filter(Boolean),
+      ]),
+    ];
     for (const d of this.el("#inspector").querySelectorAll("details")) {
       this.inspectorDetails.set(
         this.displayedPanel + "/" + d.querySelector("summary")?.textContent,
@@ -274,8 +352,15 @@ export class Studio {
       if (input.type === "range" && input.dataset.bind) {
         this.store.begin();
         this.applyBinding(input);
-        const output = input.parentElement?.querySelector("output");
+        const output = input.closest(".field")?.querySelector("output");
         if (output) output.textContent = input.value;
+        input
+          .closest(".field")
+          ?.querySelectorAll<HTMLInputElement>("input[data-bind]")
+          .forEach((el) => {
+            if (el !== input) el.value = input.value;
+          });
+        this.view.reconcile(this.p);
       }
     });
     this.el<HTMLInputElement>("#search").oninput = (e) => {
@@ -289,11 +374,15 @@ export class Studio {
         file = input.files?.[0];
       if (!file) return;
       try {
-        const p = importProject(JSON.parse(await file.text()));
+        const document = JSON.parse(await file.text());
+        const p =
+          document.format === "xpin-scene/1"
+            ? compileScene(document)
+            : importProject(document);
         this.stop();
         this.time = 0;
         this.selection = [];
-        this.store.replace(p);
+        this.store.replace(upgrade(p));
         this.view.pose = clone(p.camera);
         this.toast("工程与内嵌素材已恢复");
       } catch (e) {
@@ -597,6 +686,10 @@ export class Studio {
       light: "点击沙盘放置一盏局部追光灯。",
       target: "拖动光斑落点；点击物件会建立跟随绑定。",
     }[tool];
+    if (tool === "mark") {
+      this.panel = "object";
+      this.renderInspector();
+    }
   }
   setMode(mode: Mode) {
     this.stop();
@@ -617,7 +710,7 @@ export class Studio {
   layoutViewport() {
     const v = this.el("#viewport"),
       s = this.el("#stage");
-    if (this.mode === "build") {
+    if (this.mode === "build" && !this.liveRecording) {
       v.style.width = "100%";
       v.style.height = "100%";
     } else {
@@ -660,6 +753,154 @@ export class Studio {
     this.select([id]);
   }
   async action(action: string) {
+    if (
+      this.liveRecording &&
+      ["video", "png", "new", "demo", "import"].includes(action)
+    ) {
+      this.toast("先停止录制并保存，再执行此操作。");
+      return;
+    }
+    if (action === "board-view") {
+      this.setMode("build");
+      this.view.pose = boardPose(this.p);
+      return;
+    }
+    if (action === "font-list") {
+      this.el<HTMLInputElement>("#font-file").click();
+      return;
+    }
+    if (action === "record-start") {
+      await this.recorder!.start();
+      return;
+    }
+    if (action === "record-stop" || action === "record-stop-top") {
+      await this.recorder!.stop();
+      return;
+    }
+    if (action === "sunlight") {
+      const l = sunlight();
+      this.store.edit((p) => p.lights.push(l));
+      this.select([l.id]);
+      return;
+    }
+    if (action === "board-fit") {
+      this.store.edit((p) => boardFit(p));
+      return;
+    }
+    if (action === "entrance") {
+      const id = this.selection[0];
+      if (!id) return;
+      let shot =
+        this.p.shots.find((s) => s.id === this.selectedShot) ?? this.p.shots[0];
+      this.store.edit((p) => {
+        if (!shot) {
+          shot = makeShot(p, [id]);
+          p.shots.push(shot);
+        }
+        shot.actions.push({
+          id: uid("action"),
+          targetId: id,
+          type:
+            p.items.find((o) => o.id === id)?.entrance ??
+            animationOptions(p, id)[0][0],
+          start: 0.1,
+          duration: 1.1,
+          strength: 1,
+        });
+        this.selectedShot = shot.id;
+      });
+      this.panel = "shot";
+      this.renderInspector();
+      this.toast("部件专属动画已加入镜头");
+      return;
+    }
+    if (action === "fonts") {
+      try {
+        const query = (
+          window as unknown as {
+            queryLocalFonts?: () => Promise<{ family: string }[]>;
+          }
+        ).queryLocalFonts;
+        if (!query)
+          throw Error("当前浏览器不支持读取字体，可手动填写已安装字体名称。");
+        const result = await Promise.race([
+          query.call(window),
+          new Promise<never>((_, reject) =>
+            setTimeout(
+              () =>
+                reject(
+                  Error(
+                    "字体读取超时；可导入本机字体清单，或直接输入字体名称。",
+                  ),
+                ),
+              30000,
+            ),
+          ),
+        ]);
+        if (!result.length) {
+          this.toast("浏览器未返回本机字体列表；可直接输入已安装字体名称。");
+          return;
+        }
+        this.fonts = [
+          ...new Set([...this.fonts, ...result.map((f) => f.family)]),
+        ].sort();
+        this.renderInspector();
+        this.toast(`已读取 ${this.fonts.length} 种字体`);
+      } catch (e) {
+        this.toast(String(e));
+      }
+      return;
+    }
+    if (action === "fonts-unify") {
+      this.store.edit((p) =>
+        p.items.forEach((o) => {
+          delete o.font;
+          delete o.fontScale;
+        }),
+      );
+      return;
+    }
+    if (action.startsWith("mark-") && action !== "mark-animate") {
+      const host = this.p.items.find((o) => o.id === this.selection[0]);
+      if (!host) {
+        this.toast("先选中一张纸或相片");
+        return;
+      }
+      const m = annotation(
+        host,
+        action.slice(5),
+        this.brush.type,
+        this.brush.radius,
+        this.brush.color,
+      );
+      this.store.edit((p) => p.marks.push(m));
+      this.select([m.id]);
+      return;
+    }
+    if (action === "mark-animate") {
+      const id = this.selection[0];
+      if (!id) return;
+      let shot = this.p.shots.find((s) => s.id === this.selectedShot);
+      this.store.edit((p) => {
+        if (!shot) {
+          shot = makeShot(p, [], "overview");
+          p.shots.push(shot);
+          this.selectedShot = shot.id;
+        }
+        shot.actions.push({
+          id: uid("action"),
+          targetId: id,
+          type: "draw",
+          start: 0.2,
+          duration: 1.3,
+          strength: 1,
+        });
+      });
+      this.panel = "shot";
+      this.renderInspector();
+      return;
+    }
+
     if (action === "undo") {
       this.store.undo();
       return;
@@ -778,6 +1019,15 @@ export class Studio {
             this.time,
             this.mode,
             a < 1 ? Math.round(long * a) : long,
+            this.el<HTMLSelectElement>("#export-quality").value === "master"
+              ? 2
+              : 1,
+            this.el<HTMLSelectElement>("#export-quality").value === "master"
+              ? "ultra"
+              : this.el<HTMLSelectElement>("#export-quality").value ===
+                  "preview"
+                ? "draft"
+                : "studio",
           ),
           `XPIN-${this.time.toFixed(2)}s.png`,
         );
@@ -807,6 +1057,7 @@ export class Studio {
         const n = clone(l);
         n.id = uid("light");
         n.name += " / 副本";
+        n.presetManaged = false;
         n.position[0] += 0.4;
         this.store.edit((p) => p.lights.push(n));
         this.select([n.id]);
@@ -957,7 +1208,7 @@ export class Studio {
         ? "grow"
         : this.p.marks.some((m) => m.id === id)
           ? "draw"
-          : "settle";
+          : animationOptions(this.p, id)[0][0];
       this.store.edit(() =>
         shot.actions.push({
           id: uid("action"),
@@ -1023,6 +1274,7 @@ export class Studio {
       light: this.p.lights,
     };
     if (collections[type]) target = collections[type].find((o) => o.id === id);
+    if (type === "brush") target = this.brush;
     if (type === "settings") target = this.p.settings;
     if (type === "project") target = this.p;
     if (type === "shot")
@@ -1091,59 +1343,8 @@ export class Studio {
       this.p.lights.find((l) => l.id === id)!.hostId = undefined;
   }
   applyLook(i: number) {
-    this.store.edit((p) =>
-      Object.assign(
-        p.settings,
-        [
-          {
-            keyIntensity: 4.5,
-            ambient: 0.38,
-            keyAzimuth: 130,
-            keyElevation: 55,
-            keyColor: "#ffdfad",
-            softness: 2,
-            exposure: 1.05,
-          },
-          {
-            keyIntensity: 3.8,
-            ambient: 0.12,
-            keyAzimuth: 168,
-            keyElevation: 28,
-            keyColor: "#c8d2c8",
-            softness: 0.4,
-            exposure: 1.1,
-          },
-          {
-            keyIntensity: 3,
-            ambient: 0.9,
-            keyAzimuth: 110,
-            keyElevation: 70,
-            keyColor: "#ffedcd",
-            softness: 4,
-            exposure: 1,
-          },
-          {
-            keyIntensity: 5.5,
-            ambient: 0.32,
-            keyAzimuth: 25,
-            keyElevation: 22,
-            keyColor: "#f0c990",
-            softness: 1,
-            exposure: 1,
-          },
-          {
-            keyIntensity: 1,
-            ambient: 0.18,
-            keyAzimuth: 135,
-            keyElevation: 45,
-            keyColor: "#e8d4b3",
-            softness: 1.5,
-            exposure: 1.1,
-          },
-        ][i],
-      ),
-    );
-    this.toast("已应用真实布光预设");
+    this.store.edit((p) => applyCinemaLook(p, i));
+    this.toast("已应用电影布光；手动追光保留");
   }
   savePreset() {
     const items = this.p.items.filter((o) => this.selection.includes(o.id));
@@ -1294,7 +1495,7 @@ export class Studio {
     }
     if (this.tool === "mark") {
       const host = this.p.items.find((o) => o.id === hit?.id),
-        p = host ? worldToLocal(host, point) : clone(point);
+        p = host ? worldToLocal(host, hit?.point ?? point) : clone(point);
       p[2] = 0.025;
       this.drag = { ...base, kind: "mark", hostId: host?.id, points: [p] };
       return;
@@ -1375,7 +1576,12 @@ export class Studio {
   }
   move(e: PointerEvent) {
     const d = this.drag,
-      point = this.view.boardPoint(e.clientX, e.clientY) ?? [0, 0, 0.04];
+      hostPlane = this.p.items.find((o) => o.id === d?.hostId),
+      point = this.view.boardPoint(
+        e.clientX,
+        e.clientY,
+        hostPlane ? hostPlane.position[2] + 0.015 : 0.006,
+      ) ?? [0, 0, 0.04];
     if (!d) {
       if (this.tool === "rope" && this.ropeStart) {
         const pin = this.p.pins.find((p) => p.id === this.ropeStart);
@@ -1391,12 +1597,14 @@ export class Studio {
     }
     if (d.kind === "orbit") {
       this.view.pose.yaw = clamp(
-        d.pose.yaw + (e.clientX - d.x) * 0.004,
+        d.pose.yaw -
+          (e.clientX - d.x) * 0.004 * (this.p.settings.orbitReverse ? -1 : 1),
         -1.2,
         1.2,
       );
       this.view.pose.pitch = clamp(
-        d.pose.pitch + (e.clientY - d.y) * 0.004,
+        d.pose.pitch +
+          (e.clientY - d.y) * 0.004 * (this.p.settings.orbitReverse ? -1 : 1),
         -1,
         1,
       );
@@ -1425,7 +1633,7 @@ export class Studio {
         d.points!.push(local);
       this.drawDraft(
         d.points!.map((v) => (host ? localToWorld(host, v) : v)),
-        "#a9232b",
+        this.brush.color,
       );
       return;
     }
@@ -1512,8 +1720,9 @@ export class Studio {
             id: uid("mark"),
             hostId: d.hostId,
             points: d.points!,
-            radius: 0.024,
-            color: "#a8212a",
+            radius: this.brush.radius,
+            color: this.brush.color,
+            brush: this.brush.type,
           }),
         );
       return;
@@ -1622,8 +1831,16 @@ export class Studio {
       if (this.time >= duration(this.p)) this.stop();
       this.updateTime();
     }
-    if (!this.syncing) this.view.renderAt(this.p, this.time, this.mode);
+    if (!this.syncing)
+      this.view.renderAt(
+        this.p,
+        this.time,
+        this.mode,
+        undefined,
+        this.liveRecording,
+      );
     if (this.view.gizmoLight === "hidden") this.view.helpers.visible = false;
+    this.recorder?.capture(now);
     this.frames++;
     if (now - this.lastFps > 1000) {
       this.fps = (this.frames * 1000) / (now - this.lastFps);

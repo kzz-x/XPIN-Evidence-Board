@@ -11,6 +11,7 @@ import {
   type Transform,
   type V3,
   type Light,
+  type Action,
 } from "./model";
 export interface Frame {
   time: number;
@@ -20,6 +21,7 @@ export interface Frame {
   visible: Map<string, boolean>;
   progress: Map<string, number>;
   lights: Light[];
+  deformation: Map<string, { type: Action["type"]; strength: number }>;
 }
 export const duration = (p: Project) =>
   p.shots.reduce((n, s) => n + s.duration, 0);
@@ -53,6 +55,7 @@ export function evaluate(p: Project, time: number): Frame {
       visible: new Map(p.items.map((o) => [o.id, !o.hidden])),
       progress: new Map(),
       lights: clone(p.lights),
+      deformation: new Map(),
     };
   const starts = new Map<string, number>();
   let acc = 0;
@@ -106,6 +109,7 @@ export function evaluate(p: Project, time: number): Frame {
       if (local < a.start) continue;
       const q = smooth((local - a.start) / a.duration);
       frame.progress.set(a.targetId, q);
+      frame.deformation.set(a.targetId, { type: a.type, strength: a.strength });
       const tr = frame.transforms.get(a.targetId);
       if (tr) {
         frame.visible.set(
@@ -116,7 +120,15 @@ export function evaluate(p: Project, time: number): Frame {
         tr.position = clone(o.position);
         tr.rotation = o.rotation;
         tr.scale = o.scale;
-        if (a.type === "slide") tr.position[0] += (1 - q) * -2 * a.strength;
+        if (a.type === "pin") {
+          tr.position[2] += (1 - q) * 1.1 * a.strength;
+        } else if (a.type === "peel") {
+          tr.position[2] += (1 - q) * 0.12 * a.strength;
+        } else if (a.type === "clamp" || a.type === "thread") {
+          tr.position[1] += (1 - q) * 0.8 * a.strength;
+          tr.position[2] += (1 - q) * 0.18 * a.strength;
+        } else if (a.type === "slide")
+          tr.position[0] += (1 - q) * -2 * a.strength;
         else if (a.type === "settle") {
           tr.position[2] += (1 - q) * 1.7 * a.strength;
           tr.rotation += (1 - q) * 0.15 * a.strength;

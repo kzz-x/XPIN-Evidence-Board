@@ -5,9 +5,11 @@ import { BokehPass } from "three/addons/postprocessing/BokehPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { goboTexture } from "./gobo";
 import { Materials } from "./materials";
 import {
   createItem,
+  deformPaper,
   pinMesh,
   ropeMesh,
   markMesh,
@@ -75,7 +77,13 @@ export class BoardRenderer {
   needsSync = true;
   private pendingLoad = 0;
   private boardKind = "";
+  private boardSignature = "";
+  private sampleCount = -1;
+  private previewScale = -1;
+  border = new T.Group();
+  cookies = new Map<string, { signature: string; texture: T.Texture }>();
   gizmoLight?: string;
+  renderSettings: Partial<Project["settings"]> = {};
   constructor(
     public container: HTMLElement,
     pose: Pose,
@@ -103,11 +111,11 @@ export class BoardRenderer {
     room.dispose();
     pmrem.dispose();
     this.board = physical(
-      new T.BoxGeometry(2000, 1500, 0.4),
+      new T.BoxGeometry(23, 17, 0.4),
       this.materials.board("felt"),
     );
     this.board.position.z = -0.205;
-    this.scene.add(this.board);
+    this.scene.add(this.board, this.border);
     this.key.position.set(-10, 9, 12);
     this.key.castShadow = true;
     this.key.shadow.camera.left = -16;
@@ -118,7 +126,7 @@ export class BoardRenderer {
     this.key.shadow.camera.far = 70;
     this.key.shadow.mapSize.set(2048, 2048);
     this.key.shadow.bias = -0.00008;
-    this.key.shadow.normalBias = 0.006;
+    this.key.shadow.normalBias = 0.0007;
     this.scene.add(this.key, this.key.target, this.ambient);
     this.fill.position.set(10, -4, 8);
     this.scene.add(this.fill);
@@ -126,7 +134,10 @@ export class BoardRenderer {
     this.grid.position.z = 0.005;
     this.grid.visible = false;
     this.scene.add(this.helpers, this.selection, this.grid);
-    this.composer = new EffectComposer(this.renderer);
+    this.composer = new EffectComposer(
+      this.renderer,
+      new T.WebGLRenderTarget(1, 1, { type: T.HalfFloatType, samples: 4 }),
+    );
     this.composer.addPass(new RenderPass(this.scene, this.camera));
     this.bokeh = new BokehPass(this.scene, this.camera, {
       focus: 20,
@@ -187,11 +198,25 @@ export class BoardRenderer {
         o.color,
         o.assetId,
         o.assetId ? p.assets[o.assetId] : null,
+        o.font,
+        p.settings.font,
+        o.fontScale,
+        p.settings.fontScale,
+        o.roughness,
+        o.paperCurl,
+        o.fiberStrength,
       ]);
       if (this.signatures.get(o.id) !== signature) {
         const old = this.objects.get(o.id);
         if (old) disposeTree(old, new Set([this.materials.metal]));
-        const g = createItem(o, this.materials);
+        const g = createItem(
+          {
+            ...o,
+            font: o.font || p.settings.font,
+            fontScale: o.fontScale ?? p.settings.fontScale,
+          },
+          this.materials,
+        );
         this.objects.set(o.id, g);
         this.scene.add(g);
         this.signatures.set(o.id, signature);
@@ -205,7 +230,7 @@ export class BoardRenderer {
     for (const pin of p.pins) {
       let g = this.pins.get(pin.id);
       if (!g) {
-        g = pinMesh(pin.color, this.materials);
+        g = pinMesh(pin.color, this.materials, pin.roughness);
         g.traverse((n) => {
           n.userData = { id: pin.id, kind: "pin" };
         });
@@ -216,8 +241,10 @@ export class BoardRenderer {
           if (
             n instanceof T.Mesh &&
             n.material instanceof T.MeshPhysicalMaterial
-          )
+          ) {
             n.material.color.set(pin.color);
+            n.material.roughness = pin.roughness ?? 0.26;
+          }
         });
       }
     }
@@ -227,11 +254,20 @@ export class BoardRenderer {
         this.marks.delete(id);
       }
     for (const m of p.marks) {
-      const signature = JSON.stringify([m.points, m.color, m.radius]);
+      const host = p.items.find((o) => o.id === m.hostId);
+      const signature = JSON.stringify([
+        m.points,
+        m.color,
+        m.radius,
+        m.brush,
+        host?.width,
+        host?.height,
+        host?.paperCurl,
+      ]);
       let g = this.marks.get(m.id);
       if (!g || g.userData.signature !== signature) {
         if (g) disposeTree(g);
-        g = markMesh(m.points, m.color, m.radius);
+        g = markMesh(m.points, m.color, m.radius, m.brush, host);
         g.userData = { signature };
         g.traverse((n) => {
           n.userData = { ...n.userData, id: m.id, kind: "mark" };
@@ -242,6 +278,8 @@ export class BoardRenderer {
     }
     for (const [id, l] of this.lights)
       if (!p.lights.some((o) => o.id === id)) {
+        this.cookies.get(id)?.texture.dispose();
+        this.cookies.delete(id);
         l.dispose();
         l.removeFromParent();
         l.target.removeFromParent();
@@ -252,7 +290,7 @@ export class BoardRenderer {
         const light = new T.SpotLight();
         light.shadow.mapSize.set(1024, 1024);
         light.shadow.bias = -0.0001;
-        light.shadow.normalBias = 0.006;
+        light.shadow.normalBias = 0.0007;
         light.shadow.camera.near = 0.1;
         this.lights.set(l.id, light);
         this.scene.add(light, light.target);
@@ -364,21 +402,51 @@ export class BoardRenderer {
       const tr = play ? f.transforms.get(o.id)! : o;
       g.position.set(...tr.position);
       g.rotation.z = tr.rotation;
-      g.scale.setScalar(tr.scale);
+      const dimensions = g.userData.dimensionScale ?? [1, 1, 1];
+      g.scale.set(
+        tr.scale * dimensions[0],
+        tr.scale * dimensions[1],
+        tr.scale * dimensions[2],
+      );
       g.visible = play ? f.visible.get(o.id)! : !o.hidden;
       const typing = p.shots.some((s) =>
           s.actions.some((a) => a.targetId === o.id && a.type === "type"),
         ),
         q = play ? (f.progress.get(o.id) ?? 1) : 1;
+      const deform = play ? f.deformation.get(o.id) : undefined;
+      g.traverse((n) => {
+        if (n instanceof T.Mesh && n.userData.paper)
+          deformPaper(
+            n,
+            o,
+            deform?.type === "peel" ? q : 1,
+            deform?.strength ?? 1,
+          );
+        if (n.userData.clipHandle)
+          n.rotation.x =
+            deform?.type === "clamp" ? (1 - q) * 0.85 * deform.strength : 0;
+        if (n.userData.clipJaw)
+          n.rotation.x =
+            deform?.type === "clamp" ? (1 - q) * 0.65 * deform.strength : 0;
+      });
+      if (o.kind === "clip")
+        g.scale.z =
+          tr.scale * (deform?.type === "clamp" ? 1 + (1 - q) * 0.35 : 1);
+      if (o.kind === "pin")
+        g.rotation.x = deform?.type === "pin" ? (1 - q) * -0.24 : 0;
       if (typing) {
         const chars = Math.floor((o.title.length + o.body.length) * q);
         if (g.userData.typed !== chars) {
-          const material = (g.children[0] as T.Mesh)
-            .material as T.MeshStandardMaterial;
+          const raw = (g.children[0] as T.Mesh).material;
+          const material = (
+            Array.isArray(raw) ? raw[0] : raw
+          ) as T.MeshStandardMaterial;
           if (material.map) {
             material.map.dispose();
             material.map = this.materials.content({
               ...o,
+              font: o.font || p.settings.font,
+              fontScale: o.fontScale ?? p.settings.fontScale,
               title: o.title.slice(0, chars),
               body: o.body.slice(0, Math.max(0, chars - o.title.length)),
             });
@@ -395,7 +463,9 @@ export class BoardRenderer {
       const host = p.items.find((o) => o.id === pin.hostId);
       g.visible = !host || (play ? f.visible.get(host.id)! : !host.hidden);
       const q = play ? (f.progress.get(pin.id) ?? 1) : 1;
-      g.position.z += (1 - q) * 0.8;
+      g.position.z +=
+        (1 - q) * 0.8 * (f.deformation.get(pin.id)?.strength ?? 1);
+      g.rotation.x = play ? (1 - q) * -0.24 : 0;
       g.visible &&= q > 0;
     }
     const ropeIds = new Set(p.ropes.map((r) => r.id));
@@ -447,14 +517,99 @@ export class BoardRenderer {
       } else g.visible = true;
       const q = play ? (f.progress.get(m.id) ?? 1) : 1;
       g.traverse((n) => {
-        if (n instanceof T.Mesh)
+        if (n instanceof T.Mesh) {
+          const deformation =
+            host && play ? f.deformation.get(host.id) : undefined;
+          if (host)
+            deformPaper(
+              n,
+              host,
+              deformation?.type === "peel" ? (f.progress.get(host.id) ?? 1) : 1,
+            );
           n.geometry.setDrawRange(
             0,
-            Math.floor(((n.geometry.index?.count ?? 0) * q) / 30) * 30,
+            Math.floor(((n.geometry.index?.count ?? 0) * q) / 6) * 6,
           );
+        }
       });
     }
-    const settings = p.settings;
+    const settings = { ...p.settings, ...this.renderSettings };
+    const boardSig = JSON.stringify([
+      settings.boardWidth,
+      settings.boardHeight,
+      settings.frameWidth,
+      settings.frameColor,
+      settings.frame,
+    ]);
+    if (boardSig !== this.boardSignature) {
+      this.board.geometry.dispose();
+      this.board.geometry = new T.BoxGeometry(
+        settings.boardWidth,
+        settings.boardHeight,
+        0.4,
+      );
+      while (this.border.children.length) disposeTree(this.border.children[0]);
+      if (settings.frame) {
+        const w = settings.boardWidth,
+          h = settings.boardHeight,
+          f = settings.frameWidth;
+        for (const [x, y, a, b] of [
+          [0, h / 2 + f / 2, w + f * 2, f],
+          [0, -h / 2 - f / 2, w + f * 2, f],
+          [-w / 2 - f / 2, 0, f, h],
+          [w / 2 + f / 2, 0, f, h],
+        ]) {
+          const bar = physical(
+            new T.BoxGeometry(a, b, 0.48),
+            new T.MeshStandardMaterial({
+              color: settings.frameColor,
+              roughness: 0.43,
+              metalness: 0.12,
+            }),
+          );
+          bar.position.set(x, y, -0.14);
+          this.border.add(bar);
+        }
+      }
+      this.boardSignature = boardSig;
+    }
+    const boardMat = this.board.material as T.MeshStandardMaterial;
+    for (const map of [
+      boardMat.map,
+      boardMat.normalMap,
+      boardMat.roughnessMap,
+      boardMat.bumpMap,
+    ])
+      if (map)
+        map.repeat.set(
+          (settings.boardWidth / 6) * settings.boardTextureScale,
+          (settings.boardHeight / 6) * settings.boardTextureScale,
+        );
+    if (!output && this.previewScale !== settings.renderScale) {
+      const scale = Math.min(devicePixelRatio, 2) * settings.renderScale;
+      this.renderer.setPixelRatio(scale);
+      this.composer.setPixelRatio(scale);
+      this.previewScale = settings.renderScale;
+    }
+    const samples =
+      settings.quality === "draft"
+        ? 0
+        : Math.min(
+            this.renderer.capabilities.maxSamples,
+            settings.quality === "ultra" ? 8 : 4,
+          );
+    if (samples !== this.sampleCount) {
+      for (const target of [
+        this.composer.renderTarget1,
+        this.composer.renderTarget2,
+      ]) {
+        target.samples = samples;
+        target.dispose();
+      }
+      this.sampleCount = samples;
+    }
+    this.look.uniforms.grain.value = settings.grain;
+
     const az = (settings.keyAzimuth * Math.PI) / 180,
       el = (settings.keyElevation * Math.PI) / 180;
     this.key.target.position.set(camera.target[0], camera.target[1], 0);
@@ -500,7 +655,33 @@ export class BoardRenderer {
       light.penumbra = l.penumbra;
       light.distance = l.distance;
       light.decay = l.decay;
-      light.castShadow = l.shadow;
+      const gobo = l.gobo && l.gobo !== "none" ? l.gobo : undefined;
+      if (gobo) {
+        const signature = JSON.stringify([gobo, l.goboRotation, l.goboScale]);
+        let cookie = this.cookies.get(l.id);
+        if (cookie?.signature !== signature) {
+          cookie?.texture.dispose();
+          cookie = {
+            signature,
+            texture: goboTexture(gobo, l.goboRotation ?? 0, l.goboScale ?? 1),
+          };
+          this.cookies.set(l.id, cookie);
+        }
+        light.map = cookie.texture;
+      } else light.map = null;
+      light.castShadow = l.shadow || Boolean(gobo);
+      const spotSize =
+        settings.quality === "draft"
+          ? 1024
+          : settings.quality === "ultra"
+            ? 4096
+            : 2048;
+      if (light.shadow.mapSize.x !== spotSize) {
+        light.shadow.mapSize.set(spotSize, spotSize);
+        light.shadow.map?.dispose();
+        light.shadow.map = null;
+      }
+
       light.shadow.radius = settings.softness;
       light.shadow.camera.far = Math.max(10, l.distance);
     }
@@ -518,8 +699,8 @@ export class BoardRenderer {
         .dot(this.camera.getWorldDirection(new T.Vector3())),
       uniforms = this.bokeh.uniforms as Record<string, T.IUniform>;
     uniforms.focus.value = Math.max(0.1, focus + settings.focusOffset);
-    uniforms.aperture.value = settings.dof * 0.0006;
-    uniforms.maxblur.value = 0.012;
+    uniforms.aperture.value = settings.dof * 0.014;
+    uniforms.maxblur.value = 0.022;
     uniforms.aspect.value = this.camera.aspect;
     this.look.uniforms.seed.value = Math.floor(time * 24) * 0.01;
     this.scene.updateMatrixWorld(true);
@@ -581,6 +762,15 @@ export class BoardRenderer {
       if (n instanceof T.Mesh && n.receiveShadow) receiver++;
     });
     return {
+      samples: this.sampleCount,
+      renderScale: this.previewScale,
+      focus: (this.bokeh.uniforms as Record<string, T.IUniform>).focus.value,
+      aperture: (this.bokeh.uniforms as Record<string, T.IUniform>).aperture
+        .value,
+      cookies: [...this.lights.values()].filter((l) => l.map).length,
+      sheets: [...this.objects.values()].filter(
+        (g) => g.children.length === 1 && g.children[0].userData.paper,
+      ).length,
       engine: `Three.js r${T.REVISION} / WebGL2`,
       renderer: ext
         ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)
@@ -595,26 +785,49 @@ export class BoardRenderer {
       contextLost: gl.isContextLost(),
     };
   }
-  async png(p: Project, time: number, mode: Mode, width = 1920) {
+  async png(
+    p: Project,
+    time: number,
+    mode: Mode,
+    width = 1920,
+    supersample = 1,
+    quality?: Project["settings"]["quality"],
+  ) {
     const aspect = ratio(p.settings.aspect),
       height = Math.round(width / aspect),
       w = this.width,
       h = this.height,
       pixel = this.renderer.getPixelRatio();
+    const previousOverride = { ...this.renderSettings };
+    this.renderSettings = {
+      ...this.renderSettings,
+      quality:
+        quality ??
+        (supersample > 1
+          ? "ultra"
+          : (this.renderSettings.quality ?? p.settings.quality)),
+    };
     try {
       this.renderer.setPixelRatio(1);
-      this.renderer.setSize(width, height, false);
+      this.renderer.setSize(width * supersample, height * supersample, false);
       this.composer.setPixelRatio(1);
-      this.composer.setSize(width, height);
+      this.composer.setSize(width * supersample, height * supersample);
       this.renderAt(p, time, mode, undefined, true);
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d")!;
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(this.renderer.domElement, 0, 0, width, height);
       const blob = await new Promise<Blob>((resolve, reject) =>
-        this.renderer.domElement.toBlob(
+        canvas.toBlob(
           (b) => (b ? resolve(b) : reject(Error("PNG 编码失败"))),
           "image/png",
         ),
       );
       return blob;
     } finally {
+      this.renderSettings = previousOverride;
       this.renderer.setPixelRatio(pixel);
       this.composer.setPixelRatio(pixel);
       this.renderer.setSize(w, h);

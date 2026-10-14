@@ -37,6 +37,16 @@ export async function recordVideo(app: Studio) {
     pixel = v.renderer.getPixelRatio(),
     w = v.width,
     h = v.height;
+  const preset = app.el<HTMLSelectElement>("#export-quality").value;
+  const supersample = preset === "master" ? 2 : 1;
+  const previousSettings = { ...app.p.settings };
+  app.p.settings.quality =
+    preset === "preview" ? "draft" : preset === "master" ? "ultra" : "studio";
+  const encodedCanvas = document.createElement("canvas");
+  encodedCanvas.width = width;
+  encodedCanvas.height = height;
+  const encodedContext = encodedCanvas.getContext("2d")!;
+  encodedContext.imageSmoothingQuality = "high";
   let output: Output | undefined, context: AudioContext | undefined;
   try {
     const codec = format === "mp4" ? "avc" : "vp9",
@@ -47,8 +57,8 @@ export async function recordVideo(app: Studio) {
       );
     v.renderer.setPixelRatio(1);
     v.composer.setPixelRatio(1);
-    v.renderer.setSize(width, height, false);
-    v.composer.setSize(width, height);
+    v.renderer.setSize(width * supersample, height * supersample, false);
+    v.composer.setSize(width * supersample, height * supersample);
     const target = new BufferTarget();
     output = new Output({
       format:
@@ -57,9 +67,15 @@ export async function recordVideo(app: Studio) {
           : new WebMOutputFormat(),
       target,
     });
-    const source = new CanvasSource(v.renderer.domElement, {
+    const source = new CanvasSource(encodedCanvas, {
       codec,
-      quality: new Quality("high"),
+      quality: new Quality(
+        preset === "preview"
+          ? "medium"
+          : preset === "master"
+            ? "very-high"
+            : "high",
+      ),
       keyFrameInterval: 2,
     });
     output.addVideoTrack(source, { frameRate: fps });
@@ -97,6 +113,7 @@ export async function recordVideo(app: Studio) {
     for (let n = 0; n < count; n++) {
       const t = n / fps;
       v.renderAt(app.p, t, "play", undefined, true);
+      encodedContext.drawImage(v.renderer.domElement, 0, 0, width, height);
       await source.add(t, Math.min(1 / fps, total - t));
       progress.value = (n + 1) / count;
       if (n % 8 === 0) await new Promise((r) => setTimeout(r, 0));
@@ -119,6 +136,7 @@ export async function recordVideo(app: Studio) {
     note.textContent = String(e);
     app.toast("输出失败：" + String(e));
   } finally {
+    Object.assign(app.p.settings, previousSettings);
     await context?.close();
     v.renderer.setPixelRatio(pixel);
     v.composer.setPixelRatio(pixel);

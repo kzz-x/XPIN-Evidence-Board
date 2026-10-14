@@ -2,11 +2,13 @@
 
 游戏式搭建三维调查沙盘，像导演一样编排证据、实体红绳、追光与电影镜头。
 
-## 当前入口：Studio V3
+## 当前入口：Studio V4
 
 正式产品位于 `src/`：Three.js / WebGL2、PBR 材质、动态投影、深度景深；统一场景与绝对时间线用于编辑、播放和输出。
 
 [下载 V3 离线工作台](releases/XPIN-Evidence-Board-Studio-V3.html)（保存 HTML 后打开，无需安装依赖）。
+
+[下载 V4 离线工作台](releases/XPIN-Evidence-Board-Studio-V4.html)。V4 增加多采样、可见景深、窗光、薄纸与纸面画笔、部件动画、实体边框、字体控制及现场录制。
 
 ```sh
 npm ci
@@ -34,6 +36,12 @@ npm run test:media
 ```
 
 `dist/XPIN-Evidence-Board-Studio.html` 是可直接用 file:// 打开的离线单文件。浏览器回归脚本默认 Windows Edge，可通过 `XPIN_BROWSER` 指定可执行文件。
+
+精制输出以 2 倍分辨率渲染再缩小；MSAA 上限以硬件实际支持为准。现场录制记录手动操作，是可变帧率 WebM；准确时间轴使用逐帧 MP4/WebM。长时间 4K 尚未验证。
+
+全局字体在场景面板，单件覆盖在物件面板。浏览器读取需要允许字体访问；也可用 PowerShell `./scripts/export-fonts.ps1 -OutputPath local-fonts.json` 导出并在面板导入。字体名称随工程保存，字体文件不内嵌。
+
+Agent 可运行 `npm run compose -- examples/Windowlight.scene.json project.json`，或添加已有工程作为第三个参数做增量修改。工作台也可直接导入场景描述。说明见 [Agent authoring](docs/AGENT-AUTHORING.md)。
 
 ## 接续开发
 

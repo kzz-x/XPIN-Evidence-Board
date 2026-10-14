@@ -17,13 +17,24 @@ try {
     }),
     errors = [],
     external = [];
-  page.on("pageerror", (e) => errors.push(String(e)));
+  page.on("pageerror", (e) => {
+    errors.push(String(e));
+    console.log("PAGE ERROR " + e);
+  });
+  page.on("console", (m) => {
+    if (m.type() === "error") console.log(m.text());
+  });
   await page.route(/^https?:/, (route) => {
     external.push(route.request().url());
     return route.abort();
   });
   await page.goto(pathToFileURL(file).href);
-  await page.waitForFunction(() => window.__XPIN, { timeout: 30000 });
+  try {
+    await page.waitForFunction(() => window.__XPIN, { timeout: 15000 });
+  } catch (e) {
+    console.log(await page.locator("body").innerText());
+    throw e;
+  }
   await page.evaluate(() => window.__XPIN.ready);
   await page.waitForTimeout(1500);
   await page.click('[data-module="note"]');

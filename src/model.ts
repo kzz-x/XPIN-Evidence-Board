@@ -34,9 +34,16 @@ export interface Item extends Transform {
   locked: boolean;
   hidden: boolean;
   groupId?: string;
+  font?: string;
+  fontScale?: number;
+  entrance?: Action["type"];
+  roughness?: number;
+  paperCurl?: number;
+  fiberStrength?: number;
 }
 export interface Pin {
   id: string;
+  roughness?: number;
   hostId?: string;
   local: V3;
   color: string;
@@ -58,6 +65,7 @@ export interface Mark {
   points: V3[];
   color: string;
   radius: number;
+  brush?: "ink" | "pencil" | "marker" | "brush";
 }
 export interface Light {
   id: string;
@@ -74,6 +82,10 @@ export interface Light {
   decay: number;
   shadow: boolean;
   enabled: boolean;
+  gobo?: "none" | "window" | "blinds" | "foliage" | "lattice";
+  goboRotation?: number;
+  goboScale?: number;
+  presetManaged?: boolean;
 }
 export interface Pose {
   target: V3;
@@ -102,7 +114,17 @@ export interface Action {
   targetId: string;
   start: number;
   duration: number;
-  type: "settle" | "slide" | "type" | "grow" | "draw" | "stamp";
+  type:
+    | "settle"
+    | "slide"
+    | "type"
+    | "grow"
+    | "draw"
+    | "stamp"
+    | "peel"
+    | "clamp"
+    | "pin"
+    | "thread";
   strength: number;
 }
 export interface Shot {
@@ -132,6 +154,17 @@ export interface Settings {
   dof: number;
   focusOffset: number;
   grid: boolean;
+  renderScale: number;
+  grain: number;
+  boardWidth: number;
+  boardHeight: number;
+  frameWidth: number;
+  frameColor: string;
+  frame: boolean;
+  font: string;
+  fontScale: number;
+  orbitReverse: boolean;
+  boardTextureScale: number;
 }
 export interface Preset {
   id: string;
@@ -191,9 +224,20 @@ export const defaults = (): Settings => ({
   keyColor: "#ffdfad",
   softness: 1.7,
   quality: "studio",
-  dof: 0.18,
+  dof: 0.35,
   focusOffset: 0,
   grid: false,
+  renderScale: 1.25,
+  grain: 0.002,
+  boardWidth: 23,
+  boardHeight: 17,
+  frameWidth: 0.3,
+  frameColor: "#352b23",
+  frame: true,
+  font: "Microsoft YaHei",
+  fontScale: 1,
+  orbitReverse: false,
+  boardTextureScale: 2.5,
 });
 export function emptyProject(): Project {
   return {
@@ -617,5 +661,66 @@ export function validateProject(p: unknown): Project {
       throw new Error("组合预设无效");
   if (s.audio && !/^data:audio\//i.test(s.audio))
     throw new Error("音频必须内嵌工程");
+  s.settings = { ...defaults(), ...s.settings };
+  if (
+    ![
+      s.settings.renderScale,
+      s.settings.boardWidth,
+      s.settings.boardHeight,
+      s.settings.frameWidth,
+      s.settings.fontScale,
+      s.settings.grain,
+      s.settings.boardTextureScale,
+    ].every(Number.isFinite) ||
+    s.settings.boardWidth < 1 ||
+    s.settings.boardHeight < 1 ||
+    s.settings.renderScale < 0.5 ||
+    s.settings.renderScale > 2 ||
+    s.settings.fontScale <= 0 ||
+    s.settings.frameWidth <= 0 ||
+    s.settings.boardTextureScale <= 0 ||
+    !validColor(s.settings.frameColor) ||
+    typeof s.settings.font !== "string"
+  )
+    throw Error("成像、边框或字体参数无效");
+  for (const o of s.items)
+    if (
+      (o.font !== undefined && typeof o.font !== "string") ||
+      (o.fontScale !== undefined &&
+        (!Number.isFinite(o.fontScale) || o.fontScale <= 0))
+    )
+      throw Error("字体参数无效");
+  for (const m of s.marks)
+    if (m.brush && !["ink", "pencil", "marker", "brush"].includes(m.brush))
+      throw Error("画笔类型无效");
+  for (const l of s.lights)
+    if (
+      (l.gobo &&
+        !["none", "window", "blinds", "foliage", "lattice"].includes(l.gobo)) ||
+      (l.goboScale !== undefined &&
+        (!Number.isFinite(l.goboScale) || l.goboScale <= 0)) ||
+      (l.goboRotation !== undefined && !Number.isFinite(l.goboRotation))
+    )
+      throw Error("窗光投影参数无效");
+  for (const o of s.items)
+    for (const v of [o.roughness, o.paperCurl, o.fiberStrength])
+      if (v !== undefined && !Number.isFinite(v)) throw Error("材质参数无效");
+  for (const shot of s.shots)
+    for (const a of shot.actions)
+      if (
+        ![
+          "settle",
+          "slide",
+          "type",
+          "grow",
+          "draw",
+          "stamp",
+          "peel",
+          "clamp",
+          "pin",
+          "thread",
+        ].includes(a.type)
+      )
+        throw Error("动画类型无效");
   return clone(s);
 }

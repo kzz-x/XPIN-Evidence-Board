@@ -194,10 +194,31 @@ export class Materials {
     return m;
   }
   content(o: Item) {
-    const { c, g } = canvas(1024, Math.round((1024 * o.height) / o.width)),
-      w = c.width,
-      h = c.height,
+    const { c, g } = canvas(2048, Math.round((2048 * o.height) / o.width)),
+      w = c.width / 2,
+      h = c.height / 2,
       rand = seeded(hash(o.id));
+    g.scale(2, 2);
+    if (o.font) {
+      const descriptor = Object.getOwnPropertyDescriptor(
+        CanvasRenderingContext2D.prototype,
+        "font",
+      )!;
+      Object.defineProperty(g, "font", {
+        get() {
+          return descriptor.get!.call(g);
+        },
+        set(v: string) {
+          const size =
+            Number(v.match(/([\d.]+)px/)?.[1] ?? 24) * (o.fontScale ?? 1);
+          const safe = JSON.stringify(o.font) + ", 'Microsoft YaHei', serif";
+          descriptor.set!.call(
+            g,
+            `${v.includes("bold") ? "bold " : ""}${size}px ${safe}`,
+          );
+        },
+      });
+    }
     g.fillStyle = o.kind === "stamp" ? "rgba(0,0,0,0)" : o.color;
     g.fillRect(0, 0, w, h);
     if (["photo", "polaroid", "film", "profile"].includes(o.kind)) {
@@ -318,12 +339,6 @@ export class Materials {
       g.fillStyle = "#3c382b";
       g.font = "56px 'KaiTi','Microsoft YaHei',serif";
       this.wrap(g, o.body, 45, 150, w - 85, 80, 7);
-      g.strokeStyle = "#655531";
-      g.lineWidth = 4;
-      g.beginPath();
-      g.moveTo(w * 0.25, h * 0.8);
-      g.quadraticCurveTo(w * 0.5, h * 0.77, w * 0.74, h * 0.8);
-      g.stroke();
     } else if (o.kind === "label" || o.kind === "date") {
       g.fillStyle = "#2c332c";
       g.font = `bold ${o.kind === "date" ? 55 : 64}px monospace`;
@@ -461,14 +476,14 @@ export class Materials {
     return new T.MeshPhysicalMaterial({
       map,
       color: "#ffffff",
-      roughness: photographic ? 1 : 0.9,
+      roughness: o.roughness ?? (photographic ? 1 : 0.9),
       roughnessMap,
       bumpMap: this.paper,
-      bumpScale: 0.009,
+      bumpScale: (photographic ? 0.0003 : 0.0008) * (o.fiberStrength ?? 1),
       clearcoat: ["photo", "polaroid"].includes(o.kind) ? 0.16 : 0,
       clearcoatMap,
       clearcoatRoughness: 0.55,
-      side: T.DoubleSide,
+      side: T.FrontSide,
       transparent: o.kind === "stamp",
       alphaTest: o.kind === "stamp" ? 0.05 : 0,
     });

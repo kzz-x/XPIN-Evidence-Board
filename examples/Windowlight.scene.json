@@ -1,0 +1,31 @@
+{
+  "format":"xpin-scene/1",
+  "name":"窗边的档案 / Agent 场景示例",
+  "look":5,
+  "fitBoard":true,
+  "settings":{"board":"cork","dof":0.25,"quality":"ultra","renderScale":1.5,"font":"KaiTi"},
+  "items":[
+    {"id":"photo-a","kind":"polaroid","title":"最后一次目击","position":[-1.4,0.4,0.035],"rotationDeg":-8},
+    {"id":"note-a","kind":"note","body":"从这里开始。","position":[1.6,-0.6,0.05],"rotationDeg":5},
+    {"id":"clip-a","kind":"clip","position":[-1.2,2.15,0.13]}
+  ],
+  "pins":[
+    {"id":"pin-a","hostId":"photo-a","local":[0.65,1.15,0.025],"color":"#a6222a"},
+    {"id":"pin-b","hostId":"note-a","local":[-0.45,0.7,0.025],"color":"#a6222a"}
+  ],
+  "ropes":[{"id":"rope-a","from":"pin-a","to":"pin-b"}],
+  "marks":[{"id":"mark-a","hostId":"note-a","shape":"underline","brush":"pencil","radius":0.012}],
+  "shots":[
+    {"id":"shot-a","title":"纸张铺贴与夹紧","targetIds":["photo-a","note-a"],"duration":4,"motion":"push",
+     "actions":[
+       {"id":"act-paper","targetId":"photo-a","type":"peel","start":0,"duration":1.4,"strength":1},
+       {"id":"act-note","targetId":"note-a","type":"peel","start":0.2,"duration":1,"strength":1},
+       {"id":"act-clip","targetId":"clip-a","type":"clamp","start":1.1,"duration":0.7,"strength":1},
+       {"id":"act-pin1","targetId":"pin-a","type":"pin","start":1.4,"duration":0.45,"strength":1},
+       {"id":"act-pin2","targetId":"pin-b","type":"pin","start":1.7,"duration":0.45,"strength":1},
+       {"id":"act-rope","targetId":"rope-a","type":"grow","start":2.1,"duration":0.7,"strength":1},
+       {"id":"act-ink","targetId":"mark-a","type":"draw","start":2.6,"duration":1,"strength":1}
+     ]},
+    {"id":"shot-b","title":"窗光下的线索","targetIds":["note-a"],"duration":3,"motion":"focus"}
+  ]
+}

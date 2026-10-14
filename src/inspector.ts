@@ -1,3 +1,4 @@
+import { looks, brushes, gobos, animationOptions } from "./cinema";
 import type { Studio } from "./studio";
 import { moduleByKind } from "./modules";
 import {
@@ -25,6 +26,8 @@ export function inspector(app: Studio) {
     `<div class="selection-heading"><small>${small}</small><h2>${esc(title)}</h2>${desc ? `<p>${esc(desc)}</p>` : ""}</div>`;
   if (app.panel === "object") {
     if (o) {
+      const hardware = ["clip", "pin", "staple", "tape"].includes(o.kind);
+      const paper = !["clip", "pin", "staple", "stamp"].includes(o.kind);
       html =
         heading(moduleByKind(o.kind).category + " / SELECTED", o.title) +
         section(
@@ -34,8 +37,28 @@ export function inspector(app: Studio) {
             (["photo", "polaroid", "film", "profile"].includes(o.kind)
               ? button("替换本地影像", "image", "photo", "wide-button")
               : "") +
-            color("纸张 / 材质颜色", "item.color", o.color),
+            color("纸张 / 材质颜色", "item.color", o.color) +
+            select("字体覆盖", "item.font", o.font ?? "", [
+              ["", "跟随全局字体"],
+              ...app.fonts.map((f) => [f, f] as [string, string]),
+            ]) +
+            range(
+              "文字大小",
+              "item.fontScale",
+              o.fontScale ?? p.settings.fontScale,
+              0.4,
+              2.5,
+              0.05,
+            ),
         );
+      if (hardware)
+        html =
+          heading(moduleByKind(o.kind).category + " / SELECTED", o.title) +
+          section(
+            "部件",
+            text("名称", "item.title", o.title) +
+              color("材质颜色", "item.color", o.color),
+          );
       html += section(
         "位置与姿态",
         `<div class="field-row">${number("X", "item.position.0", o.position[0])}${number("Y", "item.position.1", o.position[1])}${number("层高 Z", "item.position.2", o.position[2], 0.01)}</div>` +
@@ -52,6 +75,51 @@ export function inspector(app: Studio) {
           `<div class="field-row">${number("宽度", "item.width", o.width)}${number("高度", "item.height", o.height)}</div>` +
           check("锁定物件", "item.locked", o.locked) +
           check("隐藏物件", "item.hidden", o.hidden),
+      );
+      html += section(
+        "材质与部件动画",
+        range(
+          "表面粗糙度",
+          "item.roughness",
+          o.roughness ??
+            (o.kind === "clip"
+              ? 0.35
+              : o.kind === "pin"
+                ? 0.26
+                : o.kind === "staple"
+                  ? 0.24
+                  : o.kind === "tape"
+                    ? 0.7
+                    : 0.9),
+          0.2,
+          1,
+          0.01,
+        ) +
+          (paper
+            ? range(
+                "纸张翘曲",
+                "item.paperCurl",
+                o.paperCurl ?? 1,
+                0,
+                3,
+                0.05,
+              ) +
+              range(
+                "纸纤维强度",
+                "item.fiberStrength",
+                o.fiberStrength ?? 1,
+                0,
+                3,
+                0.05,
+              )
+            : " ") +
+          select(
+            "专属入场动画",
+            "item.entrance",
+            o.entrance ?? animationOptions(p, o.id)[0][0],
+            animationOptions(p, o.id),
+          ) +
+          button("应用到故事镜头", "entrance", "play", "wide-button"),
       );
       html += section(
         "关系与组合",
@@ -94,8 +162,17 @@ export function inspector(app: Studio) {
         section(
           "图钉",
           color("塑料颜色", "pin.color", pin.color) +
+            range(
+              "塑料粗糙度",
+              "pin.roughness",
+              pin.roughness ?? 0.26,
+              0.08,
+              1,
+              0.01,
+            ) +
             `<div class="field-row">${number("局部 X", "pin.local.0", pin.local[0])}${number("局部 Y", "pin.local.1", pin.local[1])}${number("局部 Z", "pin.local.2", pin.local[2], 0.01)}</div>`,
         ) +
+        button("图钉钉入动画", "entrance", "play", "wide-button") +
         button("从这里连接", "rope", "rope", "primary wide-button") +
         button("删除图钉", "delete", "trash", "wide-button");
     } else if (mark) {
@@ -104,7 +181,9 @@ export function inspector(app: Studio) {
         section(
           "笔迹",
           color("墨迹颜色", "mark.color", mark.color) +
-            range("笔画粗细", "mark.radius", mark.radius, 0.005, 0.08, 0.001),
+            select("画笔种类", "mark.brush", mark.brush ?? "ink", brushes) +
+            range("笔画粗细", "mark.radius", mark.radius, 0.002, 0.04, 0.001) +
+            button("逐笔绘制动画", "mark-animate", "play", "wide-button"),
         ) +
         button("删除标注", "delete", "trash", "wide-button");
     } else if (l) {
@@ -117,7 +196,7 @@ export function inspector(app: Studio) {
     const s = p.settings;
     html =
       heading("LIGHTING DEPARTMENT", "让线索被看见", "主光塑形，追光讲述。") +
-      `<div class="look-presets">${["暖冷电影", "Noir 硬光", "柔和档案", "侧逆光", "追光调查"].map((v, i) => `<button data-look="${i}">${v}</button>`).join("")}</div>`;
+      `<div class="look-presets">${looks.map((look, i) => `<button data-look="${i}">${look.name}</button>`).join("")}</div>`;
     html += section(
       "主造型光",
       range("光线方位", "settings.keyAzimuth", s.keyAzimuth, 0, 360, 1, "°") +
@@ -143,12 +222,24 @@ export function inspector(app: Studio) {
             `<button class="light-row ${l.id === id ? "active" : ""}" data-select="${l.id}"><span style="--light:${l.color}" class="light-dot"></span><span>${esc(l.name)}<small>${l.hostId ? "跟随物件" : "自由落点"} / ${l.enabled ? "点亮" : "熄灭"}</small></span>${icon("light")}</button>`,
         )
         .join("") +
-        button("添加一盏追光灯", "add-light", "plus", "wide-button"),
+        button("添加一盏追光灯", "add-light", "plus", "wide-button") +
+        button("添加窗外日光", "sunlight", "light", "wide-button"),
     );
     if (l)
       html += section(
         "当前追光",
         text("灯光名称", "light.name", l.name) +
+          select("投影片 / 窗光", "light.gobo", l.gobo ?? "none", gobos) +
+          range(
+            "窗影旋转",
+            "light.goboRotation",
+            l.goboRotation ?? 0,
+            -90,
+            90,
+            1,
+            "°",
+          ) +
+          range("窗影尺度", "light.goboScale", l.goboScale ?? 1, 0.5, 2, 0.01) +
           check("灯光开启", "light.enabled", l.enabled) +
           range("亮度", "light.intensity", l.intensity, 0, 350, 1) +
           color("灯光颜色", "light.color", l.color) +
@@ -183,6 +274,29 @@ export function inspector(app: Studio) {
             ["3:4", "3:4 / 档案肖像"],
             ["1:1", "1:1 / 方形画幅"],
           ]) +
+          range(
+            "板材纹理密度",
+            "settings.boardTextureScale",
+            s.boardTextureScale,
+            0.5,
+            6,
+            0.1,
+          ) +
+          range("板宽", "settings.boardWidth", s.boardWidth, 4, 60, 0.1) +
+          range("板高", "settings.boardHeight", s.boardHeight, 4, 40, 0.1) +
+          check("实体边框", "settings.frame", s.frame) +
+          range(
+            "边框宽度",
+            "settings.frameWidth",
+            s.frameWidth,
+            0.05,
+            1,
+            0.01,
+          ) +
+          color("边框颜色", "settings.frameColor", s.frameColor) +
+          button("边框适配现有布局", "board-fit", "focus", "wide-button") +
+          button("整板取景", "board-view", "camera", "wide-button") +
+          check("反转环视方向", "settings.orbitReverse", s.orbitReverse) +
           check("显示网格", "settings.grid", s.grid),
       );
     html += section(
@@ -190,12 +304,43 @@ export function inspector(app: Studio) {
       range("曝光", "settings.exposure", s.exposure, 0.25, 2, 0.01) +
         range("景深强度", "settings.dof", s.dof, 0, 1, 0.01) +
         range("焦点偏移", "settings.focusOffset", s.focusOffset, -8, 8, 0.05) +
+        range(
+          "预览分辨率倍率",
+          "settings.renderScale",
+          s.renderScale,
+          0.5,
+          2,
+          0.05,
+        ) +
+        range("胶片颗粒", "settings.grain", s.grain, 0, 0.025, 0.001) +
         select("预览质量", "settings.quality", s.quality, [
           ["draft", "快速 / 1024 阴影 / 无景深"],
-          ["studio", "影棚 / 2048 阴影"],
-          ["ultra", "精细 / 4096 阴影"],
+          ["studio", "影棚 / 4× MSAA / 2048 阴影"],
+          ["ultra", "精细 / 最高 MSAA / 4096 阴影"],
         ]) +
         `<p class="helper">真实 GPU 渲染，无软件光影替身。输出沿用当前质量档。</p>`,
+    );
+    html += section(
+      "全局字体",
+      select(
+        "全局文字字体",
+        "settings.font",
+        s.font,
+        app.fonts.map((f) => [f, f]),
+      ) +
+        text("字体名称（可直接输入）", "settings.font", s.font) +
+        range(
+          "全局文字大小",
+          "settings.fontScale",
+          s.fontScale,
+          0.4,
+          2.5,
+          0.05,
+        ) +
+        button("读取本机字体", "fonts", "file", "wide-button") +
+        button("导入本机字体清单", "font-list", "folder", "wide-button") +
+        button("全部跟随此字体", "fonts-unify", "group", "wide-button") +
+        '<p class="helper">物件可单独覆盖。跨机器需安装相同字体；字体名称随工程保存，不嵌入字体文件。</p>',
     );
     html +=
       section(
@@ -290,14 +435,7 @@ export function inspector(app: Studio) {
                 "出场方式",
                 `action.${a.id}.type`,
                 a.type,
-                [
-                  ["settle", "甩入贴附"],
-                  ["slide", "滑入"],
-                  ["type", "打字揭示"],
-                  ["grow", "绳索生长"],
-                  ["draw", "沿路绘制"],
-                  ["stamp", "印章压下"],
-                ],
+                animationOptions(p, a.targetId, a.type),
               )}<div class="field-row">${number("开始", `action.${a.id}.start`, a.start)}${number("时长", `action.${a.id}.duration`, a.duration)}${number("强度", `action.${a.id}.strength`, a.strength)}</div><button data-remove-action="${a.id}">移除轨道</button></div>`,
           )
           .join(""),
@@ -322,5 +460,26 @@ export function inspector(app: Studio) {
         '<p class="helper">在布光面板选灯光，加入 Cue。镜头运动和追光可以独立编排。</p>',
     );
   }
+  if (app.panel === "object" && app.tool === "mark")
+    html =
+      section(
+        "画笔工作台",
+        select("画笔", "brush.type", app.brush.type, brushes) +
+          range(
+            "新笔迹粗细",
+            "brush.radius",
+            app.brush.radius,
+            0.002,
+            0.04,
+            0.001,
+          ) +
+          color("新笔迹颜色", "brush.color", app.brush.color) +
+          '<p class="helper">选中纸张可添加预设，或在纸面拖动自由书写。</p><div class="button-grid">' +
+          button("画圈", "mark-circle") +
+          button("划线", "mark-underline") +
+          button("箭头", "mark-arrow") +
+          button("波浪线", "mark-wave") +
+          "</div>",
+      ) + html;
   return html;
 }

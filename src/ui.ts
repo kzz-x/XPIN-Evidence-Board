@@ -63,11 +63,24 @@ export function range(
   step = 0.1,
   suffix = "",
 ) {
-  return `<label class="field range"><span>${label}<output>${Number(value.toFixed(2))}${suffix}</output></span><input aria-label="${label}" type="range" data-bind="${bind}" value="${value}" min="${min}" max="${max}" step="${step}"></label>`;
+  return `<label class="field range"><span>${label}<output>${Number(value.toFixed(3))}${suffix}</output></span><div class="numeric-control"><input aria-label="${label}滑块" type="range" data-bind="${bind}" value="${value}" min="${min}" max="${max}" step="${step}"><input aria-label="${label}" type="number" data-bind="${bind}" value="${Number(value.toFixed(3))}" step="${step}"></div></label>`;
 }
 export function number(label: string, bind: string, value: number, step = 0.1) {
-  return `<label class="field compact"><span>${label}</span><input aria-label="${label}" type="number" data-bind="${bind}" value="${Number(value.toFixed(3))}" step="${step}"></label>`;
+  const positive = /width|height|scale|duration|strength|Intensity|Angle/.test(
+    bind,
+  );
+  const max = /Intensity/.test(bind)
+    ? 1000
+    : /Angle/.test(bind)
+      ? 85
+      : /width|height/.test(bind)
+        ? 40
+        : /duration|start/.test(bind)
+          ? 60
+          : 20;
+  return range(label, bind, value, positive ? step : -max, max, step);
 }
+
 export function select(
   label: string,
   bind: string,

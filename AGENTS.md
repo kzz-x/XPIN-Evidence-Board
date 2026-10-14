@@ -3,7 +3,7 @@
 ## 目标与基线
 以 [True3D V2](prototypes/XPIN-Evidence-Board-True3D-V2.html) 已可操作的三维调查沙盘为起点，逐阶段升级为高质量、可编辑、可播放的三维叙事工作台。
 
-当前正式入口已为 Studio V3：`index.html → src/main.ts`。V2 保留为兼容/回退原件。新一轮先看 PROGRESS 的真实边界，再看 [ARCHITECTURE](docs/ARCHITECTURE.md)，不要再将 `src/` 当作空壳或重建第二套入口。
+当前正式入口为 Studio V4：`index.html → src/main.ts`。V2/V3 离线版保留为兼容和回退原件。先看 PROGRESS 的真实边界，再看 [ARCHITECTURE](docs/ARCHITECTURE.md)。Agent 场景生成见 [AGENT-AUTHORING](docs/AGENT-AUTHORING.md)，不要另建一套入口。
 
 先读 [PROGRESS.md](PROGRESS.md)，根据本轮任务读 [ROADMAP.md](docs/ROADMAP.md) 和 [LOOKDEV.md](docs/LOOKDEV.md)；有关绑定/时间/保存时读 [ENGINE.md](docs/ENGINE.md)，验收时读 [ACCEPTANCE.md](docs/ACCEPTANCE.md)。不必每次加载全部资料。
 

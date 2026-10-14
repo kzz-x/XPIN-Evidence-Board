@@ -35,7 +35,11 @@ async function reset() {
     s.setMode("build");
     await s.view.sync(s.p);
     s.view.scene.traverse((o) => {
-      if (o.isMesh && o.material.type !== "MeshBasicMaterial")
+      if (
+        o.isMesh &&
+        o.material.type !== "MeshBasicMaterial" &&
+        o.userData.kind !== "mark"
+      )
         o.castShadow = true;
     });
   }, baseline);
@@ -547,7 +551,7 @@ await test("short video is encoded, downloaded and actually decoded", async () =
   return result;
 });
 const report = {
-  date: "2026-10-13",
+  date: new Date().toISOString(),
   browser: "Windows Edge / headless / D3D11",
   results,
   errors,

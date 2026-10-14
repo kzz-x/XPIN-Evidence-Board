@@ -1,0 +1,63 @@
+.numeric-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.numeric-control input[type="range"] {
+  min-width: 24px;
+  width: 100%;
+  flex: 1;
+}
+.numeric-control input[type="number"] {
+  width: 74px;
+  padding: 6px;
+  flex: none;
+}
+.field-row .field {
+  min-width: 0;
+}
+.field-row .numeric-control {
+  flex-wrap: wrap;
+  gap: 3px;
+}
+.field-row .numeric-control input[type="number"] {
+  width: 100%;
+}
+.range output {
+  font-variant-numeric: tabular-nums;
+}
+.record-box {
+  border: 1px solid var(--border);
+  padding: 14px;
+  margin-top: 20px;
+  border-radius: 8px;
+}
+.record-box p {
+  color: var(--muted);
+  line-height: 1.7;
+}
+body:has([data-recording="true"]) [data-action="record-stop-top"] {
+  display: flex;
+  color: #ffc7aa;
+  background: #643829;
+}
+[data-action="record-stop-top"] {
+  display: none;
+}
+.inspector-panel {
+  min-width: 300px;
+}
+.look-presets {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+.look-presets button {
+  padding: 10px 6px;
+}
+.font-specimen {
+  margin: 8px 0;
+  padding: 12px;
+  background: #272e27;
+  font-size: 18px;
+}
