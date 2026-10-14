@@ -1,0 +1,9 @@
+import { defineConfig } from "vite";
+export default defineConfig({
+  base: "./",
+  build: {
+    target: "es2022",
+    assetsInlineLimit: 2_000_000,
+    chunkSizeWarningLimit: 2200,
+  },
+});

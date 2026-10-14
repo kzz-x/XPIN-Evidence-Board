@@ -1,5 +1,7 @@
 # 引擎约束｜状态、坐标、关系、时间线
 
+2026-10-13 实现更新：Studio V3 使用 Three.js + TypeScript、纯函数 StoryEngine、WebCodecs + Mediabunny；Konva/GSAP 不再是运行依赖。实际文件分工与约束见 [ARCHITECTURE](ARCHITECTURE.md)。下文早期方案为协议背景，完成程度以 PROGRESS 实测为准。
+
 实现可模块化的本地 HTML 编辑器。推荐 Vite + TypeScript + Konva（画布编辑）+ GSAP（时间线/摄像机），必要时可以用等价方案。渲染表现与工程数据分离。
 
 ## 系统边界

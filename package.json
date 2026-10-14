@@ -1,19 +1,28 @@
 {
   "name": "xpin-evidence-board",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.3.0",
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview --host 127.0.0.1"
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "tsx --test tests/model.test.ts",
+    "test:browser": "node scripts/regression.mjs",
+    "test:media": "node scripts/audio-check.mjs",
+    "format": "prettier --write src tests scripts vite.config.ts",
+    "standalone": "node scripts/standalone.mjs"
   },
   "dependencies": {
-    "gsap": "^3.13.0",
-    "konva": "^9.3.22"
+    "mediabunny": "1.61.4",
+    "three": "0.180.0"
   },
   "devDependencies": {
-    "typescript": "^5.9.2",
-    "vite": "^7.1.0"
+    "@playwright/test": "1.56.1",
+    "@types/three": "0.180.0",
+    "prettier": "3.6.2",
+    "tsx": "4.20.6",
+    "typescript": "5.9.3",
+    "vite": "7.3.7"
   }
 }

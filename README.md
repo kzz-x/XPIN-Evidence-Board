@@ -1,17 +1,44 @@
-# 差点调查沙盘｜XPIN Evidence Board Studio
+# XPIN Evidence Board Studio
 
-用游戏式操作搭一面真正有厚度的三维调查板，再像导演一样控制证据出场、红绳连接、聚光追随与电影运镜。
+游戏式搭建三维调查沙盘，像导演一样编排证据、实体红绳、追光与电影镜头。
 
-## 当前可玩的版本：True3D V2
+## 当前入口：Studio V3
 
-**[打开独立 HTML 原型](prototypes/XPIN-Evidence-Board-True3D-V2.html)**：下载后使用 Chrome / Edge 打开。当前交互版本包含二维搭建、三维透视、模块/图钉/连接、初步镜头与播放。它是后续迭代的**现有基线**。
+正式产品位于 `src/`：Three.js / WebGL2、PBR 材质、动态投影、深度景深；统一场景与绝对时间线用于编辑、播放和输出。
 
-注意：V2 的软件渲染模式具有三维透视和几何层级，但灯光/投影与景深仍有模拟成分；内置 WebGL2 路径还需目标设备实测。**不能把 V2 当作最终 PBR 画质或完整灯光系统。**
+[下载 V3 离线工作台](releases/XPIN-Evidence-Board-Studio-V3.html)（保存 HTML 后打开，无需安装依赖）。
 
-## Codex 接续
+```sh
+npm ci
+npm run dev
+```
 
-先读 [AGENTS.md](AGENTS.md)、[PROGRESS.md](PROGRESS.md)，按 [开发路线](docs/ROADMAP.md) 从第一个未完成里程碑推进。美术、光影、手动追光、实体红绳详见 [LOOKDEV.md](docs/LOOKDEV.md)，产品与基础数据协议见 [PRODUCT.md](docs/PRODUCT.md) / [ENGINE.md](docs/ENGINE.md)，具体交互验证见 [ACCEPTANCE.md](docs/ACCEPTANCE.md)。
+打开终端显示的本地地址。需要支持 WebGL2 的桌面 Chrome / Edge；没有模拟光影后备。
 
-仓库 `src/` 中仍是早期 Vite + TypeScript **空界面脚手架**（`npm run dev` 不会启动完整 V2）；正式模块化时应从 V2 真正工作能力接入，统一为一个产品入口，而不是独立重做两套。此阶段不以已有脚手架取代 V2。
+## 使用
 
-目标：编辑时轻松像游戏，播放时有真实灯光、纸张材质、绳索实体和空间运镜。
+从左侧拖入相片或文件，点击编辑内容和本地图片。V 移动、R 旋转、E 缩放；Shift 多选或框选，空格拖动平移、Alt 拖动环视、滚轮缩放。P 钉图钉，C 依次点击图钉拉绳，M 自由手绘。
+
+布光面板控制主光和追光；灯位与落点可以拖动，也可以绑定某份资料。选择证据加入镜头，在故事卡中调整摄影机、出场和追光 Cue。播放头可任意回拖，工程布局保持可编辑。
+
+工程 JSON 内嵌图片和音频；自动保存使用 IndexedDB。输出 PNG、MP4 或 WebM 都来自同一个三维场景，隐藏编辑辅助。视频使用固定时间戳逐帧编码，声音按作品时长裁切或补静音。
+
+## 构建与验证
+
+```sh
+npm run build
+npm run standalone
+npm test
+npm run test:browser
+npm run test:media
+```
+
+`dist/XPIN-Evidence-Board-Studio.html` 是可直接用 file:// 打开的离线单文件。浏览器回归脚本默认 Windows Edge，可通过 `XPIN_BROWSER` 指定可执行文件。
+
+## 接续开发
+
+阅读 [AGENTS](AGENTS.md)、[PROGRESS](PROGRESS.md)、[ARCHITECTURE](docs/ARCHITECTURE.md)。完整产品目标见 [PRODUCT](docs/PRODUCT.md)，美术目标见 [LOOKDEV](docs/LOOKDEV.md)，验收见 [ACCEPTANCE](docs/ACCEPTANCE.md)。合法资产来源见 [ASSETS](docs/ASSETS.md)。
+
+[V2 原型](prototypes/XPIN-Evidence-Board-True3D-V2.html) 保持原样供回退。V3 可导入 V2 JSON，并重建真实三维材质与关系。
+
+V3 已实现制作闭环；最终实拍质感、长尾模块、专业轨道及长时间 4K 输出的完成程度与实测边界以 PROGRESS 为准。
