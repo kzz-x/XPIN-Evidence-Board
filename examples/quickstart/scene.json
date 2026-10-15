@@ -1,0 +1,243 @@
+{
+  "format": "xpin-scene/1",
+  "name": "入门练习 / 两份证据的关系",
+  "look": 0,
+  "fitBoard": true,
+  "settings": {
+    "board": "cork",
+    "aspect": "16:9",
+    "quality": "studio",
+    "dof": 0.18,
+    "font": "Microsoft YaHei",
+    "keyIntensity": 0.5,
+    "ambient": 0.55,
+    "grain": 0.002
+  },
+  "assetFiles": { "evidence-map": "./evidence.svg" },
+  "camera": {
+    "target": [0, 0, 0.1],
+    "distance": 19,
+    "yaw": 0.1,
+    "pitch": -0.15,
+    "roll": 0,
+    "focal": 40
+  },
+  "items": [
+    {
+      "id": "photo-a",
+      "kind": "photo",
+      "title": "目击地点",
+      "body": "示例地图 / 可替换为本地照片",
+      "position": [-2, 0.5, 0.04],
+      "rotationDeg": -5,
+      "assetId": "evidence-map"
+    },
+    {
+      "id": "file-b",
+      "kind": "file",
+      "title": "现场记录",
+      "body": "23:40 最后目击\n00:12 车辆经过\n01:26 收到照片\n\n这些信息是否来自同一个地点？",
+      "position": [2, 0.4, 0.06],
+      "rotationDeg": 4
+    },
+    {
+      "id": "note-c",
+      "kind": "note",
+      "title": "待核实",
+      "body": "先看地点，再看时间。",
+      "position": [0, -2.3, 0.08],
+      "rotationDeg": -3
+    },
+    {
+      "id": "clip-d",
+      "kind": "clip",
+      "position": [-2, 1.95, 0.065],
+      "width": 0.65,
+      "height": 0.75
+    }
+  ],
+  "pins": [
+    {
+      "id": "pin-a",
+      "hostId": "photo-a",
+      "local": [0.5, 0.95, 0.035],
+      "color": "#b5242c"
+    },
+    {
+      "id": "pin-b",
+      "hostId": "file-b",
+      "local": [-0.55, 1.25, 0.035],
+      "color": "#b5242c"
+    }
+  ],
+  "ropes": [
+    {
+      "id": "rope-ab",
+      "from": "pin-a",
+      "to": "pin-b",
+      "radius": 0.02,
+      "slack": 0.12,
+      "bend": 0.08
+    }
+  ],
+  "marks": [
+    {
+      "id": "mark-b",
+      "hostId": "file-b",
+      "shape": "circle",
+      "brush": "pencil",
+      "radius": 0.01,
+      "color": "#ad3032"
+    }
+  ],
+  "lights": [
+    {
+      "id": "window-key",
+      "name": "窗外暖光",
+      "position": [-5, 7, 12],
+      "target": [0, 0, 0.1],
+      "intensity": 700,
+      "angle": 32,
+      "penumbra": 0.35,
+      "distance": 60,
+      "gobo": "window",
+      "goboRotation": -18,
+      "goboScale": 1
+    }
+  ],
+  "shots": [
+    {
+      "id": "shot-arrival",
+      "title": "01 / 证据抵达",
+      "duration": 4,
+      "targetIds": ["photo-a", "file-b"],
+      "motion": "push",
+      "actions": [
+        {
+          "id": "a-photo",
+          "targetId": "photo-a",
+          "type": "slide",
+          "phase": "in",
+          "start": 0.2,
+          "duration": 1.8,
+          "strength": 0.5,
+          "ease": "cinematic",
+          "direction": "left",
+          "fade": 0.85
+        },
+        {
+          "id": "a-file",
+          "targetId": "file-b",
+          "type": "peel",
+          "start": 0.5,
+          "duration": 1.8,
+          "strength": 0.45,
+          "ease": "smooth",
+          "direction": "right",
+          "fade": 0.8
+        },
+        {
+          "id": "a-note",
+          "targetId": "note-c",
+          "type": "peel",
+          "start": 0.7,
+          "duration": 1.8,
+          "strength": 0.4,
+          "direction": "bottom"
+        },
+        {
+          "id": "a-clip",
+          "targetId": "clip-d",
+          "type": "clamp",
+          "start": 1.8,
+          "duration": 0.8,
+          "strength": 0.6,
+          "origin": "local"
+        },
+        {
+          "id": "a-pin-a",
+          "targetId": "pin-a",
+          "type": "pin",
+          "start": 2.1,
+          "duration": 0.6,
+          "strength": 0.6,
+          "origin": "local"
+        },
+        {
+          "id": "a-pin-b",
+          "targetId": "pin-b",
+          "type": "pin",
+          "start": 2.3,
+          "duration": 0.6,
+          "strength": 0.6,
+          "origin": "local"
+        },
+        {
+          "id": "a-rope",
+          "targetId": "rope-ab",
+          "type": "grow",
+          "start": 2.9,
+          "duration": 0.9,
+          "strength": 1,
+          "ease": "smooth"
+        }
+      ]
+    },
+    {
+      "id": "shot-detail",
+      "title": "02 / 圈出关键记录",
+      "duration": 4,
+      "targetIds": ["file-b"],
+      "motion": "focus",
+      "actions": [
+        {
+          "id": "a-mark",
+          "targetId": "mark-b",
+          "type": "draw",
+          "start": 0.5,
+          "duration": 1.7,
+          "strength": 1,
+          "ease": "gentle",
+          "fade": 0.65
+        }
+      ],
+      "cues": [
+        {
+          "id": "cue-window",
+          "lightId": "window-key",
+          "start": 0.2,
+          "duration": 2.5,
+          "targetId": "file-b",
+          "from": [-2, 0.5, 0.1],
+          "to": [2, 0.4, 0.1],
+          "fromIntensity": 650,
+          "toIntensity": 800,
+          "fromAngle": 32,
+          "toAngle": 26,
+          "ease": "smooth"
+        }
+      ]
+    },
+    {
+      "id": "shot-overview",
+      "title": "03 / 关系网全览",
+      "duration": 4,
+      "targetIds": [],
+      "motion": "overview",
+      "actions": [
+        {
+          "id": "a-note-out",
+          "targetId": "note-c",
+          "type": "slide",
+          "phase": "out",
+          "start": 2.8,
+          "duration": 1.2,
+          "strength": 0.4,
+          "ease": "accelerate",
+          "direction": "bottom",
+          "fade": 0.9
+        }
+      ]
+    }
+  ]
+}

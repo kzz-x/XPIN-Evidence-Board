@@ -2,6 +2,15 @@
 
 更新：2026-10-15。当前版本：Studio V4.1 / 0.4.1。工程 JSON 保持 version 3 兼容。
 
+## 使用指南与 Agent 原生制作（2026-10-15）
+
+- 新增 [总入口](docs/START-HERE.md)、[人类使用指南](docs/USER-GUIDE.md)、[Agent 原生制作指南](docs/AGENT-NATIVE.md) 和 [协议速查](docs/SCENE-REFERENCE.md)；README、AGENTS 与旧 Agent 入口统一导航。
+- `src/authoring.ts` 提供无 DOM 的源码 API；`npm run project` 原生执行 compose / validate / inspect / sample，不需要浏览器或页面操作。
+- 新增自带本地素材的 12 秒三镜头场景、稳定 ID 增量 patch、可执行 TypeScript 制作例子。文件命令与旧 compose 共享加载层，兼容 UTF-8 BOM，独占新建输出，拒绝覆盖源文件。
+- inspect 提供 ID、引用、全局镜头区间与重叠／超时警告；sample 输出普通 JSON 的引擎状态，不把 Map 序列化为空对象。两者明确 renderValidated=false。
+- 本轮模型／原生 CLI 测试 33/33，包含命令运行、素材内嵌、源文件字节保护、BOM、无效引用、时序警告、重复采样与增量保留。构建与原生严格类型检查通过；没有更改渲染／交互逻辑，也没有重跑上一阶段全部 GPU 测试。新入门场景做了数据／时序验证，没有电影美术或完整视频验收。
+- 原生能力当前覆盖可编辑工程制作与数据／时序检查；没有纯 Node 的 PNG／MP4 输出命令。最终像素仍在工作台 WebGL2 生成，不能声称已有无浏览器视频渲染后端。
+
 ## V4.1 · 柔和出入场与曲线
 
 本轮恢复点：`main@a2a1e870f1501ce10f877f7c814721029b9d9969`。V4 发行原件保留。

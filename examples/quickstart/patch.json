@@ -1,0 +1,11 @@
+{
+  "format": "xpin-scene/1",
+  "settings": { "exposure": 1.05 },
+  "items": [
+    {
+      "id": "note-c",
+      "kind": "note",
+      "body": "仅更新这张便签；原始位置、尺寸、镜头和图片保留。"
+    }
+  ]
+}

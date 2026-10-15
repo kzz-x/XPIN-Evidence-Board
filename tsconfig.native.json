@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "types": ["node"] },
+  "include": [
+    "src/authoring.ts",
+    "scripts/project.ts",
+    "scripts/compose.ts",
+    "scripts/lib/project-files.ts",
+    "examples/native-authoring.ts",
+    "tests/native.test.ts"
+  ]
+}

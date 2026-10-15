@@ -2,6 +2,22 @@
 
 游戏式搭建三维调查沙盘，像导演一样编排证据、实体红绳、追光与电影镜头。
 
+## 快速上手与制作
+
+- [从这里开始](docs/START-HERE.md)：人类与 Agent 的最短路径。
+- [人类使用指南](docs/USER-GUIDE.md)：从搭板、布光、镜头、缓动到保存／输出。
+- [Agent 原生制作指南](docs/AGENT-NATIVE.md)：直接使用 Node CLI 与 TypeScript API，不操作浏览器。
+- [协议速查](docs/SCENE-REFERENCE.md)：坐标、字段、ID、时序和增量更新规则。
+
+Agent 可在源码中直接运行：
+
+```sh
+npm ci
+npm run native:example -- test-results/native-quickstart
+```
+
+原生入口为 `src/authoring.ts`；`npm run project -- --help` 查看 compose / validate / inspect / sample。示例生成可编辑工程、增量修改版与时序报告，全程不启动浏览器。最终像素由工作台 WebGL2 输出，当前没有纯 Node 的 PNG／视频渲染 CLI。
+
 ## 当前入口：Studio V4.1
 
 正式产品位于 `src/`：Three.js / WebGL2、PBR 材质、动态投影、深度景深；统一场景与绝对时间线用于编辑、播放和输出。
@@ -43,7 +59,7 @@ npm run test:media
 
 全局字体在场景面板，单件覆盖在物件面板。浏览器读取需要允许字体访问；也可用 PowerShell `./scripts/export-fonts.ps1 -OutputPath local-fonts.json` 导出并在面板导入。字体名称随工程保存，字体文件不内嵌。
 
-Agent 可运行 `npm run compose -- examples/Windowlight.scene.json project.json`，或添加已有工程作为第三个参数做增量修改。工作台也可直接导入场景描述。说明见 [Agent authoring](docs/AGENT-AUTHORING.md)。
+Agent 可运行 `npm run project -- compose examples/quickstart/scene.json project.json`，或添加已有工程作为最后一个参数做增量修改。旧 `npm run compose` 仍可用；所有 CLI 输出只新建，不覆盖已有文件。详细说明见 [Agent 原生制作](docs/AGENT-NATIVE.md)。
 
 ## 接续开发
 

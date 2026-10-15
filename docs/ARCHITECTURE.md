@@ -4,6 +4,8 @@
 
 | 模块 | 责任 |
 |---|---|
+| `authoring.ts` | 无 DOM 的 Agent 原生入口、数据／时序报告及可序列化帧状态 |
+| `scripts/project.ts` / `scripts/lib/project-files.ts` | Node CLI、文件素材内嵌、BOM 兼容、只新建输出 |
 | `model.ts` | 版本 3 工程协议、世界/局部坐标、复制引用重映射、导入验证 |
 | `catalog.ts` / `cinema.ts` | 不依赖图片/DOM 的模块规格、电影预设、专属入场、场景升级与笔迹预设 |
 | `compose.ts` | 外部 Agent 的 xpin-scene/1 描述与稳定 ID 增量编译 |
@@ -25,6 +27,8 @@
 编辑态不被播放中间值污染。图钉保存宿主 ID 和局部坐标；绳保存图钉 ID；标注保存宿主局部路径。组使用 groupId 并对成员同步施加中心变换，暂不支持嵌套父级组。
 
 `evaluate` 无墙钟、随机或渲染资源依赖。所有 Cue 从工程基线与绝对时间重新计算。Renderer 缓存按内容/端点签名更新，删除时释放 GPU 资源。纸张内容替换不会替换 ID。
+
+Agent 制作使用 `src/authoring.ts`，不导入带图片资源的 `modules.ts`、UI、浏览器存储或渲染器。`inspectProject` / `sampleProject` 先克隆验证，输出普通 JSON，明确 `renderValidated:false`。文件入口和完整示例见 [AGENT-NATIVE](AGENT-NATIVE.md)。原生路径尚无 PNG／MP4 渲染后端。
 
 输出调用同一个 `renderAt`，切换输出尺寸及画幅后隐藏 UI 辅助，最后恢复编辑器。视频逐帧 `CanvasSource.add(n/fps,1/fps)`，不使用实时屏幕录制。当前使用内存 BufferTarget；长时间 4K 视频的内存上限需要进一步压力测试。
 

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000">
+  <rect width="1600" height="1000" fill="#14252b"/>
+  <path d="M0 720L1600 420M0 880L1600 620M320 0L720 1000M980 0L1100 1000" stroke="#677d7c" stroke-width="30"/>
+  <path d="M0 520C600 200 900 1050 1600 750" fill="none" stroke="#283c46" stroke-width="120"/>
+  <g fill="#8c9b93"><rect x="170" y="180" width="200" height="200"/><rect x="610" y="260" width="180" height="230"/><rect x="1130" y="160" width="260" height="200"/><rect x="260" y="760" width="220" height="140"/><rect x="1180" y="800" width="250" height="140"/></g>
+  <circle cx="800" cy="580" r="52" fill="none" stroke="#cb6b4d" stroke-width="10"/>
+  <text x="70" y="95" fill="#e3d9ba" font-family="sans-serif" font-size="44" letter-spacing="8">CASE 047 / DEMO MAP</text>
+  <text x="70" y="965" fill="#d5c6a6" font-family="sans-serif" font-size="26">OWNED VECTOR PLACEHOLDER / REPLACE WITH YOUR EVIDENCE</text>
+</svg>
