@@ -12,7 +12,9 @@ import {
   type V3,
   type Light,
   type Action,
+  ratio,
 } from "./model";
+import { actionSample, actionOrigin, screenOffset, spatial } from "./motion";
 export interface Frame {
   time: number;
   shotIndex: number;
@@ -20,6 +22,8 @@ export interface Frame {
   transforms: Map<string, Transform>;
   visible: Map<string, boolean>;
   progress: Map<string, number>;
+  opacity: Map<string, number>;
+  offsets: Map<string, V3>;
   lights: Light[];
   deformation: Map<string, { type: Action["type"]; strength: number }>;
 }
@@ -54,21 +58,21 @@ export function evaluate(p: Project, time: number): Frame {
       transforms: new Map(p.items.map((o) => [o.id, clone(o)])),
       visible: new Map(p.items.map((o) => [o.id, !o.hidden])),
       progress: new Map(),
+      opacity: new Map(
+        [...p.items, ...p.pins, ...p.ropes, ...p.marks].map((o) => [o.id, 1]),
+      ),
+      offsets: new Map(),
       lights: clone(p.lights),
       deformation: new Map(),
     };
-  const starts = new Map<string, number>();
+  const tracks: { action: Action; start: number }[] = [];
   let acc = 0;
   for (const shot of p.shots) {
     for (const a of shot.actions)
-      if (!starts.has(a.targetId)) starts.set(a.targetId, acc + a.start);
+      tracks.push({ action: a, start: acc + a.start });
     acc += shot.duration;
   }
-  for (const [id, start] of starts) {
-    frame.progress.set(id, t >= start ? 1 : 0);
-    if (frame.visible.has(id))
-      frame.visible.set(id, frame.visible.get(id)! && t >= start);
-  }
+  tracks.sort((a, b) => a.start - b.start);
   acc = 0;
   let previous = clone(p.camera);
   for (let i = 0; i < p.shots.length; i++) {
@@ -105,39 +109,100 @@ export function evaluate(p: Project, time: number): Frame {
       roll: mix(previous.roll, to.roll, k),
       focal: mix(previous.focal, to.focal, k),
     };
-    for (const a of s.actions) {
-      if (local < a.start) continue;
-      const q = smooth((local - a.start) / a.duration);
-      frame.progress.set(a.targetId, q);
-      frame.deformation.set(a.targetId, { type: a.type, strength: a.strength });
-      const tr = frame.transforms.get(a.targetId);
-      if (tr) {
-        frame.visible.set(
-          a.targetId,
-          !p.items.find((o) => o.id === a.targetId)?.hidden,
+    previous = clone(to);
+    acc += s.duration;
+  }
+  // Every target has a chronological state; an exit alone starts fully visible.
+  // Missing optional fields improve old projects without rewriting authored tracks.
+  const active = new Map<string, Action>();
+  for (const { action: a, start } of tracks) {
+    if (!frame.progress.has(a.targetId)) {
+      const initial = a.phase === "out" ? 1 : 0;
+      frame.progress.set(a.targetId, initial);
+      frame.opacity.set(a.targetId, initial);
+    }
+    if (t < start) continue;
+    const sample = actionSample(a, (t - start) / a.duration);
+    frame.progress.set(a.targetId, sample.progress);
+    frame.opacity.set(a.targetId, sample.opacity);
+    frame.deformation.set(a.targetId, { type: a.type, strength: a.strength });
+    active.set(a.targetId, a);
+  }
+  const offsetFor = (a: Action, position: V3, radius: number): V3 => {
+    const q = frame.progress.get(a.targetId) ?? 1,
+      amount = (1 - q) * a.strength,
+      offset: V3 = [0, 0, 0];
+    const origin = actionOrigin(a);
+    if (!spatial(a) || origin === "stationary") return offset;
+    if (a.type === "pin") offset[2] = amount * 1.1;
+    else if (a.type === "peel") offset[2] = amount * 0.12;
+    else if (a.type === "clamp" || a.type === "thread") {
+      offset[1] = amount * 0.8;
+      offset[2] = amount * 0.18;
+    } else if (a.type === "settle") offset[2] = amount * 1.7;
+    else if (a.type === "stamp") offset[2] = amount * 0.7;
+    else if (a.type === "slide" && origin === "local") offset[0] = -2 * amount;
+    if (origin === "screen") {
+      const d = a.direction ?? (a.type === "slide" ? "left" : "top"),
+        off = screenOffset(
+          frame.camera,
+          ratio(p.settings.aspect),
+          position,
+          radius + 1.7 * Math.abs(a.strength),
+          d,
+          a.travel,
         );
-        const o = p.items.find((o) => o.id === a.targetId)!;
-        tr.position = clone(o.position);
-        tr.rotation = o.rotation;
-        tr.scale = o.scale;
-        if (a.type === "pin") {
-          tr.position[2] += (1 - q) * 1.1 * a.strength;
-        } else if (a.type === "peel") {
-          tr.position[2] += (1 - q) * 0.12 * a.strength;
-        } else if (a.type === "clamp" || a.type === "thread") {
-          tr.position[1] += (1 - q) * 0.8 * a.strength;
-          tr.position[2] += (1 - q) * 0.18 * a.strength;
-        } else if (a.type === "slide")
-          tr.position[0] += (1 - q) * -2 * a.strength;
-        else if (a.type === "settle") {
-          tr.position[2] += (1 - q) * 1.7 * a.strength;
-          tr.rotation += (1 - q) * 0.15 * a.strength;
-        } else if (a.type === "stamp") {
-          tr.position[2] += (1 - q) * 0.7 * a.strength;
-          tr.scale = o.scale * (0.8 + 0.2 * q);
-        }
+      for (let i = 0; i < 3; i++) offset[i] += off[i] * (1 - q);
+    }
+    return offset;
+  };
+  for (const o of p.items) {
+    const a = active.get(o.id),
+      tr = frame.transforms.get(o.id)!;
+    if (a) {
+      const q = frame.progress.get(o.id)!,
+        off = offsetFor(
+          a,
+          o.position,
+          (Math.hypot(o.width, o.height) * o.scale) / 2,
+        );
+      tr.position = o.position.map((n, i) => n + off[i]) as V3;
+      if (actionOrigin(a) !== "stationary") {
+        if (a.type === "settle") tr.rotation += (1 - q) * 0.15 * a.strength;
+        if (a.type === "stamp") tr.scale *= 0.8 + 0.2 * q;
       }
     }
+    frame.visible.set(o.id, !o.hidden && frame.opacity.get(o.id)! > 0);
+  }
+  for (const pin of p.pins) {
+    const a = active.get(pin.id);
+    if (a)
+      frame.offsets.set(
+        pin.id,
+        offsetFor(a, pinWorld(p, pin, frame.transforms), 0.4),
+      );
+    frame.opacity.set(
+      pin.id,
+      frame.opacity.get(pin.id)! *
+        (pin.hostId ? (frame.opacity.get(pin.hostId) ?? 1) : 1),
+    );
+  }
+  for (const m of p.marks)
+    if (m.hostId)
+      frame.opacity.set(
+        m.id,
+        frame.opacity.get(m.id)! * (frame.opacity.get(m.hostId) ?? 1),
+      );
+  for (const r of p.ropes)
+    frame.opacity.set(
+      r.id,
+      frame.opacity.get(r.id)! *
+        Math.min(frame.opacity.get(r.from) ?? 1, frame.opacity.get(r.to) ?? 1),
+    );
+  acc = 0;
+  for (const s of p.shots) {
+    const local = t - acc;
+    if (local < 0) break;
     for (const c of s.cues) {
       if (local < c.start) continue;
       const light = frame.lights.find((l) => l.id === c.lightId);
@@ -162,7 +227,6 @@ export function evaluate(p: Project, time: number): Frame {
       light.angle = mix(c.fromAngle, c.toAngle, q);
       light.enabled = light.intensity > 0;
     }
-    previous = clone(to);
     acc += s.duration;
   }
   // Resolve following lights from final animated host transforms, without mutating the project.

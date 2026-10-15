@@ -1,7 +1,8 @@
 import * as T from "three";
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
-import { BokehPass } from "three/addons/postprocessing/BokehPass.js";
+import { DepthOfFieldPass } from "./dof";
+import { fadeGroup } from "./fade";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
@@ -49,7 +50,7 @@ export class BoardRenderer {
   camera = new T.PerspectiveCamera(42, 1, 0.05, 200);
   renderer: T.WebGLRenderer;
   composer: EffectComposer;
-  bokeh: BokehPass;
+  bokeh: DepthOfFieldPass;
   look: ShaderPass;
   materials = new Materials();
   objects = new Map<string, T.Group>();
@@ -139,11 +140,7 @@ export class BoardRenderer {
       new T.WebGLRenderTarget(1, 1, { type: T.HalfFloatType, samples: 4 }),
     );
     this.composer.addPass(new RenderPass(this.scene, this.camera));
-    this.bokeh = new BokehPass(this.scene, this.camera, {
-      focus: 20,
-      aperture: 0.00005,
-      maxblur: 0.006,
-    });
+    this.bokeh = new DepthOfFieldPass(this.scene, this.camera);
     this.composer.addPass(this.bokeh);
     this.composer.addPass(new OutputPass());
     this.look = new ShaderPass(lookShader);
@@ -454,6 +451,7 @@ export class BoardRenderer {
           g.userData.typed = chars;
         }
       }
+      fadeGroup(g, play ? (f.opacity.get(o.id) ?? 1) : 1, this.materials.metal);
     }
     for (const pin of p.pins) {
       const g = this.pins.get(pin.id);
@@ -463,10 +461,12 @@ export class BoardRenderer {
       const host = p.items.find((o) => o.id === pin.hostId);
       g.visible = !host || (play ? f.visible.get(host.id)! : !host.hidden);
       const q = play ? (f.progress.get(pin.id) ?? 1) : 1;
-      g.position.z +=
-        (1 - q) * 0.8 * (f.deformation.get(pin.id)?.strength ?? 1);
+      const off = play ? f.offsets.get(pin.id) : undefined;
+      if (off) g.position.add(new T.Vector3(...off));
       g.rotation.x = play ? (1 - q) * -0.24 : 0;
-      g.visible &&= q > 0;
+      const opacity = play ? (f.opacity.get(pin.id) ?? 1) : 1;
+      g.visible &&= opacity > 0;
+      fadeGroup(g, opacity, this.materials.metal);
     }
     const ropeIds = new Set(p.ropes.map((r) => r.id));
     for (const [id, g] of this.ropes)
@@ -481,6 +481,14 @@ export class BoardRenderer {
       if (!ap || !bp) continue;
       const a = pinWorld(p, ap, play ? f.transforms : undefined),
         b = pinWorld(p, bp, play ? f.transforms : undefined);
+      if (play)
+        for (const [pin, pos] of [
+          [ap, a],
+          [bp, b],
+        ] as const) {
+          const off = f.offsets.get(pin.id);
+          if (off) for (let i = 0; i < 3; i++) pos[i] += off[i];
+        }
       a[2] += 0.145;
       b[2] += 0.145;
       const sig = JSON.stringify([a, b, r]);
@@ -496,6 +504,9 @@ export class BoardRenderer {
         this.pins.get(ap.id)?.visible && this.pins.get(bp.id)?.visible,
       );
       const progress = play ? (f.progress.get(r.id) ?? 1) : 1;
+      const opacity = play ? (f.opacity.get(r.id) ?? 1) : 1;
+      g.visible &&= opacity > 0;
+      fadeGroup(g, opacity, this.materials.metal);
       g.traverse((n) => {
         if (n instanceof T.Mesh)
           n.geometry.setDrawRange(
@@ -516,6 +527,9 @@ export class BoardRenderer {
         g.visible = play ? f.visible.get(host!.id)! : !host!.hidden;
       } else g.visible = true;
       const q = play ? (f.progress.get(m.id) ?? 1) : 1;
+      const opacity = play ? (f.opacity.get(m.id) ?? 1) : 1;
+      g.visible &&= opacity > 0;
+      fadeGroup(g, opacity, this.materials.metal);
       g.traverse((n) => {
         if (n instanceof T.Mesh) {
           const deformation =

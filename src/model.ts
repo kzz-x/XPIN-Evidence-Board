@@ -126,6 +126,14 @@ export interface Action {
     | "pin"
     | "thread";
   strength: number;
+  phase?: "in" | "out";
+  ease?: import("./motion").Ease;
+  bezier?: import("./motion").Bezier;
+  /** Fraction of the action used for the opacity ramp. Zero explicitly disables it. */
+  fade?: number;
+  origin?: "screen" | "local" | "stationary";
+  direction?: "left" | "right" | "top" | "bottom";
+  travel?: number;
 }
 export interface Shot {
   id: string;
@@ -286,7 +294,7 @@ export function pinWorld(
   const host = project.items.find((o) => o.id === pin.hostId);
   return host
     ? localToWorld(transforms?.get(host.id) ?? host, pin.local)
-    : pin.local;
+    : [...pin.local];
 }
 export const ratio = (aspect: Settings["aspect"]) =>
   ({ "16:9": 16 / 9, "9:16": 9 / 16, "3:4": 3 / 4, "1:1": 1 })[aspect];
@@ -613,7 +621,29 @@ export function validateProject(p: unknown): Project {
         !entities.has(a.targetId) ||
         !numbers(a.start, a.duration, a.strength) ||
         a.duration <= 0 ||
-        a.start < 0
+        a.start < 0 ||
+        (a.phase !== undefined && !["in", "out"].includes(a.phase)) ||
+        (a.ease !== undefined &&
+          ![
+            "cinematic",
+            "smooth",
+            "gentle",
+            "accelerate",
+            "linear",
+            "custom",
+          ].includes(a.ease)) ||
+        (a.bezier !== undefined &&
+          (!Array.isArray(a.bezier) ||
+            a.bezier.length !== 4 ||
+            !a.bezier.every((n) => Number.isFinite(n) && n >= 0 && n <= 1))) ||
+        (a.fade !== undefined &&
+          (!Number.isFinite(a.fade) || a.fade < 0 || a.fade > 1)) ||
+        (a.origin !== undefined &&
+          !["screen", "local", "stationary"].includes(a.origin)) ||
+        (a.direction !== undefined &&
+          !["left", "right", "top", "bottom"].includes(a.direction)) ||
+        (a.travel !== undefined &&
+          (!Number.isFinite(a.travel) || a.travel < 1 || a.travel > 4))
       )
         throw new Error("出场轨道无效");
     for (const c of shot.cues)

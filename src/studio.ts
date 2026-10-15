@@ -43,6 +43,7 @@ import {
   type Preset,
 } from "./model";
 import { duration, evaluate } from "./story";
+import { actionCurve, curvePreview } from "./motion";
 import { importProject } from "./migrate";
 import { icon, button, esc } from "./ui";
 import { disposeTree } from "./geometry";
@@ -229,7 +230,7 @@ export class Studio {
     ].some((o) => o.id === id);
   }
   shell() {
-    this.root.innerHTML = `<header class="topbar"><div class="brand"><span class="brand-icon">X<span>•</span></span><div><strong>XPIN <span>Evidence Board</span></strong><small>三维叙事工作台 <i>STUDIO / 03</i></small></div></div><nav class="modes" aria-label="工作模式">${["build", "director", "play"].map((m, i) => `<button data-mode="${m}" class="${!i ? "active" : ""}">${icon(["group", "camera", "play"][i])}${["搭建", "导演", "播放"][i]}</button>`).join("")}</nav><div class="project-title">${esc(this.p.name)}</div><div class="top-actions"><span id="saved" class="saved">本地工程</span>${button("撤销", "undo", "undo", "icon-button")}${button("重做", "redo", "redo", "icon-button")}${button("打开", "import", "folder")}${button("保存工程", "save", "save")}${button("输出", "output", "export", "primary")}</div></header>
+    this.root.innerHTML = `<header class="topbar"><div class="brand"><span class="brand-icon">X<span>•</span></span><div><strong>XPIN <span>Evidence Board</span></strong><small>三维叙事工作台 <i>STUDIO / 04.1</i></small></div></div><nav class="modes" aria-label="工作模式">${["build", "director", "play"].map((m, i) => `<button data-mode="${m}" class="${!i ? "active" : ""}">${icon(["group", "camera", "play"][i])}${["搭建", "导演", "播放"][i]}</button>`).join("")}</nav><div class="project-title">${esc(this.p.name)}</div><div class="top-actions"><span id="saved" class="saved">本地工程</span>${button("撤销", "undo", "undo", "icon-button")}${button("重做", "redo", "redo", "icon-button")}${button("打开", "import", "folder")}${button("保存工程", "save", "save")}${button("输出", "output", "export", "primary")}</div></header>
  <div class="workspace"><aside class="library-panel"><div class="panel-heading"><small>YOUR TOOLKIT</small><div><h2>模块背包</h2><button data-action="favorites" class="icon-button" title="只看收藏">${icon("star")}</button></div><label class="search">${icon("search")}<input aria-label="搜索模块" id="search" placeholder="寻找下一条线索…"></label></div><div class="category-tabs" id="categories"></div><div id="library" class="library"></div><div class="library-bottom"><div class="eyebrow">创作起点</div>${button("午夜档案", "demo", "folder")}${button("空白调查板", "new", "plus")}<p>拖入模块，开始构建故事。<br>素材和工程保存在本机。</p></div></aside>
  <main id="stage" class="stage"><div id="viewport" class="viewport"></div><div id="loading">正在建立三维档案室…</div><div class="stage-caption"><span class="tiny-dot"></span><span>CASE 047 / THE MIDNIGHT ARCHIVE</span></div><div class="stage-top-right"><span id="render-status">真实三维 / WebGL2</span><button data-action="helpers" class="icon-button" title="显示或隐藏灯光辅助">${icon("light")}</button></div><div class="tools" aria-label="搭建工具">${(["select", "rotate", "scale", "pin", "rope", "mark", "light", "target"] as Tool[]).map((t, i) => `<button data-tool="${t}" title="${["移动 / V", "旋转 / R", "缩放 / E", "图钉 / P", "拉绳 / C", "手绘 / M", "添加追光 / L", "指定追光落点"][i]}" class="${!i ? "active" : ""}">${icon(t === "select" ? "move" : t === "target" ? "focus" : t)}</button>`).join("")}<hr>${button("全览", "fit", "grid", "icon-button")}${button("特写", "focus", "focus", "icon-button")}</div><div class="stage-bottom"><div id="hint" class="interaction-hint">拖动摆放 · 滚轮缩放 · Alt 拖动环视 · 空格平移</div><div class="view-pill"><button data-action="front">正视</button><button data-action="angle">斜视</button><span id="fps">—</span></div></div><div id="box-select" class="box-select" hidden></div><div id="drop-preview" class="drop-preview" hidden>释放以放置模块</div><div id="toast" class="toast" role="status"></div></main>
  <aside class="inspector-panel"><div class="inspector-tabs"><button data-panel="object" class="active">物件</button><button data-panel="light">布光</button><button data-panel="scene">场景</button><button data-panel="shot">镜头</button></div><div id="inspector"></div></aside></div>
@@ -1198,7 +1199,7 @@ export class Studio {
       this.store.edit((p) => p.shots.push(s));
       return;
     }
-    if (action === "action") {
+    if (action === "action" || action === "action-out") {
       const id = this.selection[0];
       if (!id) {
         this.toast("先选择物件、图钉、红绳或标注");
@@ -1214,7 +1215,9 @@ export class Studio {
           id: uid("action"),
           targetId: id,
           type,
-          start: 0.3,
+          phase: action === "action-out" ? "out" : "in",
+          start:
+            action === "action-out" ? Math.max(0, shot.duration - 1.5) : 0.3,
           duration: 1.2,
           strength: 1,
         }),
@@ -1329,8 +1332,30 @@ export class Studio {
       target.targetId = value || undefined;
       return;
     }
+    if (type === "action") {
+      if (parts[0] === "bezier" && !target.bezier)
+        target.bezier = [...actionCurve(target)];
+      if (last === "ease" && value === "custom" && !target.bezier)
+        target.bezier = [...actionCurve(target)];
+      if (last === "fade" || parts[0] === "bezier") value = clamp(value, 0, 1);
+      if (last === "travel") value = clamp(value, 1, 4);
+    }
     for (const key of parts.slice(0, -1)) target = target[key];
     target[last] = value;
+    if (type === "action") {
+      const a = this.p.shots
+        .find((s) => s.id === this.selectedShot)
+        ?.actions.find((a) => a.id === input.dataset.bind!.split(".")[1]);
+      if (a)
+        this.root
+          .querySelector(`[data-curve="${a.id}"]`)
+          ?.insertAdjacentHTML("afterend", curvePreview(a));
+      // Replace just the graph, preserving the actively dragged slider.
+      const graphs = a
+        ? this.root.querySelectorAll(`[data-curve="${a.id}"]`)
+        : [];
+      if (graphs.length > 1) graphs[0].remove();
+    }
     if (type === "settings" && last === "aspect") {
       this.p.camera = poseFor(this.p, [], "overview");
       for (const shot of this.p.shots)

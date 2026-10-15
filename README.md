@@ -2,13 +2,15 @@
 
 游戏式搭建三维调查沙盘，像导演一样编排证据、实体红绳、追光与电影镜头。
 
-## 当前入口：Studio V4
+## 当前入口：Studio V4.1
 
 正式产品位于 `src/`：Three.js / WebGL2、PBR 材质、动态投影、深度景深；统一场景与绝对时间线用于编辑、播放和输出。
 
 [下载 V3 离线工作台](releases/XPIN-Evidence-Board-Studio-V3.html)（保存 HTML 后打开，无需安装依赖）。
 
 [下载 V4 离线工作台](releases/XPIN-Evidence-Board-Studio-V4.html)。V4 增加多采样、可见景深、窗光、薄纸与纸面画笔、部件动画、实体边框、字体控制及现场录制。
+
+[下载 V4.1 离线工作台](releases/XPIN-Evidence-Board-Studio-V4.1.html)。所有出入场默认柔和淡化，支持画外起终点、四个方向、入场／退场轨道及可视贝塞尔曲线。旧工程直接导入即可使用改进后的默认演出。
 
 ```sh
 npm ci

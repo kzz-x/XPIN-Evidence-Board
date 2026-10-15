@@ -427,13 +427,60 @@ try {
     await page.click('[data-action="output"]');
     await page.selectOption("#export-fps", "30");
     await page.click('[data-action="record-start"]');
-    await page.waitForTimeout(600);
+    await page.waitForFunction(
+      () => {
+        const r = window.__XPIN.studio.recorder;
+        return (
+          r?.frames >= 12 && r.chunks.reduce((n, c) => n + c.size, 0) > 128
+        );
+      },
+      null,
+      { timeout: 15000 },
+    );
     await page.evaluate(() => (window.__XPIN.studio.view.pose.yaw += 0.2));
-    await page.waitForTimeout(600);
+    await page.waitForFunction(
+      () => window.__XPIN.studio.recorder?.frames >= 24,
+      null,
+      { timeout: 15000 },
+    );
     const download = page.waitForEvent("download");
     await page.click('[data-action="record-stop-top"]');
     const file = await download;
     await file.saveAs(out + "/live-recording.webm");
+    const decoded = await page.evaluate(
+      async (data) => {
+        const bytes = Uint8Array.from(atob(data), (c) => c.charCodeAt(0));
+        const url = URL.createObjectURL(
+            new Blob([bytes], { type: "video/webm" }),
+          ),
+          video = document.createElement("video");
+        try {
+          video.src = url;
+          video.muted = true;
+          await new Promise((resolve, reject) => {
+            video.onloadeddata = resolve;
+            video.onerror = () => reject(Error("recorded clip cannot decode"));
+          });
+          const seeked = new Promise((resolve) => (video.onseeked = resolve));
+          video.currentTime = Math.min(0.2, video.duration / 2);
+          await seeked;
+          return {
+            width: video.videoWidth,
+            height: video.videoHeight,
+            duration: video.duration,
+            seek: video.currentTime,
+          };
+        } finally {
+          video.removeAttribute("src");
+          video.load();
+          URL.revokeObjectURL(url);
+        }
+      },
+      (await readFile(out + "/live-recording.webm")).toString("base64"),
+    );
+    assert.ok(
+      decoded.width >= 1280 && decoded.duration > 0 && decoded.seek > 0,
+    );
     assert.equal(
       await page.evaluate(() => window.__XPIN.studio.liveRecording),
       false,
@@ -441,6 +488,7 @@ try {
     return {
       path: file.suggestedFilename(),
       status: await page.locator("#record-status").textContent(),
+      decoded,
     };
   });
   await test("master PNG supersampling yields exact requested dimensions", async () => {

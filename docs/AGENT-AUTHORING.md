@@ -27,6 +27,8 @@
 
 轨道 start/duration 为镜头内的秒数。类型：peel 柔纸/胶带、pin 图钉、clamp 夹子、thread 回形针、slide/settle、stamp、type、grow 绳索、draw 墨迹。轨道 ID 稳定且唯一；避免重复添加同一入场。
 
+V4.1 的出入场支持 `phase/ease/bezier/fade/origin/direction/travel`，缺省直接改善旧轨道。字段与示例见 [MOTION](MOTION.md)。同一目标建议先入场、停留、再退场；不要重叠安排多个入场，重叠时以最后开始的轨道为准。
+
 代码接口 `window.__XPIN.compile(brief, source?)` 返回工程；project/evaluate/seek/png/audit 用于验证。固定源 + 描述 + 目标关键帧构成可复现的交接包。不要覆盖原源文件，也不要将示例默认值当成用户需求。
 
 下一步需增加嵌套层级、碰撞/构图约束、轨道编辑、材质资产库与自然语言助手的审计界面。

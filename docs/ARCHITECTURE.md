@@ -1,4 +1,4 @@
-# Studio V4 维护入口
+# Studio V4.1 维护入口
 
 正式入口是 `index.html → src/main.ts`。`prototypes/` 中 V2 保持原样，仅用于回退和兼容性回归。
 
@@ -10,6 +10,7 @@
 | `store.ts` | 完整状态的撤销重做、事务、IndexedDB 自动保存、文件工具 |
 | `modules.ts` | 模块目录、类别、默认规格、20 秒演示工程 |
 | `migrate.ts` | 非破坏性迁移 V2 JSON，包括嵌入 SVG 素材 |
+| `motion.ts` / `fade.ts` / `dof.ts` | 贝塞尔求值、画外路径、材质淡化及透明度一致的阴影／景深 |
 | `story.ts` | `evaluate(project,t)`：纯函数求相机、出场、笔迹/绳生长、LightCue |
 | `materials.ts` | 内容贴图、PBR 材质、合法本地资产加载与缓存 |
 | `geometry.ts` | 纸面翘曲、实体固定件、三股绳、细纤维、墨迹几何 |

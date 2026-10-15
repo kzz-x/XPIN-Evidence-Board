@@ -1,7 +1,7 @@
 {
   "name": "xpin-evidence-board",
   "private": true,
-  "version": "0.4.0",
+  "version": "0.4.1",
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
@@ -12,8 +12,9 @@
     "test:media": "node scripts/audio-check.mjs",
     "test:v4": "node scripts/v4-regression.mjs",
     "format": "prettier --write src tests scripts vite.config.ts",
-    "standalone": "node scripts/standalone.mjs"
-    ,"compose": "tsx scripts/compose.ts"
+    "standalone": "node scripts/standalone.mjs",
+    "compose": "tsx scripts/compose.ts",
+    "test:motion": "node scripts/motion-regression.mjs"
   },
   "dependencies": {
     "mediabunny": "1.61.4",

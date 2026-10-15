@@ -1,4 +1,12 @@
 import { looks, brushes, gobos, animationOptions } from "./cinema";
+import {
+  eases,
+  curvePreview,
+  actionCurve,
+  actionOrigin,
+  spatial,
+} from "./motion";
+import type { Action } from "./model";
 import type { Studio } from "./studio";
 import { moduleByKind } from "./modules";
 import {
@@ -426,17 +434,17 @@ export function inspector(app: Studio) {
       false,
     );
     html += section(
-      "出场与逐笔轨道",
-      `<div class="helper">先选物件、绳索或标注，再加入本镜头。</div><div class="button-grid">${button("加入选中物入场", "action", "plus")}${button("加入选中追光", "cue", "light")}</div>` +
+      "入场 / 退场与逐笔轨道",
+      `<div class="helper">选物件后加入轨道。默认淡化，画外位置按当前镜头与输出画幅计算；局部动作仍可选择近处或原位。</div><div class="button-grid">${button("加入选中物入场", "action", "plus")}${button("加入选中物退场", "action-out", "plus")}${button("加入选中追光", "cue", "light")}</div>` +
         shot.actions
           .map(
             (a) =>
               `<div class="track-row"><b>${esc(app.name(a.targetId))}</b>${select(
-                "出场方式",
+                "动作方式",
                 `action.${a.id}.type`,
                 a.type,
                 animationOptions(p, a.targetId, a.type),
-              )}<div class="field-row">${number("开始", `action.${a.id}.start`, a.start)}${number("时长", `action.${a.id}.duration`, a.duration)}${number("强度", `action.${a.id}.strength`, a.strength)}</div><button data-remove-action="${a.id}">移除轨道</button></div>`,
+              )}${motionControls(a)}<div class="field-row">${number("开始", `action.${a.id}.start`, a.start)}${number("时长", `action.${a.id}.duration`, a.duration)}${number("强度", `action.${a.id}.strength`, a.strength)}</div><button data-remove-action="${a.id}">移除轨道</button></div>`,
           )
           .join(""),
     );
@@ -482,4 +490,47 @@ export function inspector(app: Studio) {
           "</div>",
       ) + html;
   return html;
+}
+
+function motionControls(a: Action) {
+  const bind = `action.${a.id}`,
+    c = actionCurve(a);
+  return (
+    select("演出阶段", `${bind}.phase`, a.phase ?? "in", [
+      ["in", "入场 · 淡入"],
+      ["out", "退场 · 淡出"],
+    ]) +
+    select(
+      "缓动曲线",
+      `${bind}.ease`,
+      a.ease ?? (a.phase === "out" ? "accelerate" : "cinematic"),
+      eases,
+    ) +
+    curvePreview(a) +
+    (a.ease === "custom"
+      ? `<div class="field-row">${range("起点控制 X", `${bind}.bezier.0`, c[0], 0, 1, 0.01)}${range("起点控制 Y", `${bind}.bezier.1`, c[1], 0, 1, 0.01)}</div><div class="field-row">${range("终点控制 X", `${bind}.bezier.2`, c[2], 0, 1, 0.01)}${range("终点控制 Y", `${bind}.bezier.3`, c[3], 0, 1, 0.01)}</div>`
+      : "") +
+    range("淡化占比", `${bind}.fade`, a.fade ?? 0.65, 0, 1, 0.01) +
+    (spatial(a)
+      ? select("起止位置", `${bind}.origin`, actionOrigin(a), [
+          ["screen", "画面外"],
+          ["local", "物件附近"],
+          ["stationary", "原位动作 / 淡化"],
+        ]) +
+        (actionOrigin(a) === "screen"
+          ? select(
+              "画外方向",
+              `${bind}.direction`,
+              a.direction ?? (a.type === "slide" ? "left" : "top"),
+              [
+                ["left", "左侧"],
+                ["right", "右侧"],
+                ["top", "上方"],
+                ["bottom", "下方"],
+              ],
+            ) +
+            range("画外距离", `${bind}.travel`, a.travel ?? 1, 1, 4, 0.05, "×")
+          : "")
+      : "")
+  );
 }

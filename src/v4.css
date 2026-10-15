@@ -8,7 +8,7 @@
   width: 100%;
   flex: 1;
 }
-.numeric-control input[type="number"] {
+.field.range .numeric-control input[type="number"] {
   width: 74px;
   padding: 6px;
   flex: none;
@@ -20,7 +20,7 @@
   flex-wrap: wrap;
   gap: 3px;
 }
-.field-row .numeric-control input[type="number"] {
+.field-row .field.range .numeric-control input[type="number"] {
   width: 100%;
 }
 .range output {
@@ -60,4 +60,31 @@ body:has([data-recording="true"]) [data-action="record-stop-top"] {
   padding: 12px;
   background: #272e27;
   font-size: 18px;
+}
+.ease-graph {
+  width: 100%;
+  height: 100px;
+  margin: 4px 0 10px;
+  border-radius: 6px;
+  background: #141d19;
+}
+.ease-grid {
+  fill: none;
+  stroke: #354238;
+  stroke-width: 0.6;
+}
+.ease-handle {
+  fill: none;
+  stroke: #7d795d;
+  stroke-width: 0.8;
+  stroke-dasharray: 2 2;
+}
+.ease-line {
+  fill: none;
+  stroke: #c3b17a;
+  stroke-width: 2;
+}
+.ease-graph text {
+  fill: #9eaa96;
+  font-size: 7px;
 }
