@@ -131,6 +131,10 @@ try {
       s.select([s.p.items.find((o) => o.kind === "photo").id]);
       s.setTool("mark");
     });
+    await page.locator('[data-action="mark-circle"]').evaluate((el) => {
+      for (let d = el.parentElement; d; d = d.parentElement)
+        if (d.tagName === "DETAILS") d.open = true;
+    });
     await page.click('[data-action="mark-circle"]');
     const evidence = await page.evaluate(() => {
       const s = window.__XPIN.studio,
@@ -161,6 +165,10 @@ try {
     assert.ok(evidence.hostId);
     assert.equal(evidence.caster, 0);
     assert.ok(evidence.zmax < 0.06);
+    await page.locator('[data-action="mark-animate"]').evaluate((el) => {
+      for (let d = el.parentElement; d; d = d.parentElement)
+        if (d.tagName === "DETAILS") d.open = true;
+    });
     await page.click('[data-action="mark-animate"]');
     assert.ok(await page.locator('[data-bind$=".type"]').count());
     return evidence;

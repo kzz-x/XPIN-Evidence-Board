@@ -235,3 +235,14 @@ export function sampleProject(input: Project, seconds: number) {
     lights: f.lights,
   };
 }
+
+export { auditProduction, cameraPosition } from "./production-audit";
+export { surfaceAt, liftToSurface } from "./surface";
+export { ropeHeights } from "./rope-clearance";
+
+export {
+  cameraProgress,
+  cameraCurve,
+  mixFocus,
+  lensState,
+} from "./camera-motion";

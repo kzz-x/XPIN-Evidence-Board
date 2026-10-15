@@ -12,18 +12,8 @@ export function physical<
   mesh.receiveShadow = true;
   return mesh;
 }
-export function paperSurface(o: Item, x: number, y: number) {
-  const u = Math.max(-0.5, Math.min(0.5, x / o.width)),
-    v = Math.max(-0.5, Math.min(0.5, y / o.height));
-  return (
-    0.007 +
-    ((Math.pow(Math.abs(u) * 2, 8) * 0.018 +
-      Math.pow(Math.abs(v) * 2, 10) * 0.01) *
-      (o.kind === "note" ? 1.5 : 1) +
-      Math.sin(u * 2.3 + v * 1.2) * 0.002) *
-      (o.paperCurl ?? 1)
-  );
-}
+export { paperSurface } from "./surface";
+import { paperSurface } from "./surface";
 /** One closed sheet; back and edge share the front curvature. */
 export function paperGeometry(o: Item) {
   const n = 32,
@@ -132,8 +122,13 @@ export function createItem(o: Item, mat: Materials) {
         bevelSize: 0.012,
         bevelThickness: 0.008,
       }),
-      new T.MeshStandardMaterial({
+      new T.MeshPhysicalMaterial({
         color: o.color,
+        roughnessMap: mat.metalFinish,
+        bumpMap: mat.metalFinish,
+        bumpScale: 0.0001,
+        clearcoat: 0.25,
+        clearcoatRoughness: 0.3,
         metalness: 0.74,
         roughness: o.roughness ?? 0.35,
       }),
@@ -141,7 +136,10 @@ export function createItem(o: Item, mat: Materials) {
     body.rotation.y = Math.PI / 2;
     body.position.x = -0.29;
     g.add(body);
-    const jawMaterial = new T.MeshStandardMaterial({
+    const jawMaterial = new T.MeshPhysicalMaterial({
+      roughnessMap: mat.metalFinish,
+      clearcoat: 0.25,
+      clearcoatRoughness: 0.3,
       color: o.color,
       metalness: 0.7,
       roughness: o.roughness ?? 0.3,
@@ -248,12 +246,15 @@ export function pinMesh(color: string, mat: Materials, roughness = 0.26) {
     new T.Vector2(0.073, 0.245),
     new T.Vector2(0, 0.25),
   ];
-  const head = physical(new T.LatheGeometry(profile, 48), plastic);
+  const rounded = new T.SplineCurve(profile)
+    .getPoints(64)
+    .map((v) => new T.Vector2(Math.max(0, v.x), v.y));
+  const head = physical(new T.LatheGeometry(rounded, 64), plastic);
   head.rotation.x = Math.PI / 2;
   head.position.z = 0.035;
   g.add(head);
   const shaft = physical(
-    new T.CylinderGeometry(0.013, 0.009, 0.19, 10),
+    new T.CylinderGeometry(0.013, 0.009, 0.19, 24),
     mat.metal,
   );
   shaft.rotation.x = Math.PI / 2;
@@ -267,6 +268,7 @@ export class RopeCurve extends T.Curve<T.Vector3> {
     public b: V3,
     public rope: Rope,
     public strand = -1,
+    public heights?: number[],
   ) {
     super();
   }
@@ -279,6 +281,12 @@ export class RopeCurve extends T.Curve<T.Vector3> {
       t,
       this.rope.control,
     );
+    if (this.heights) {
+      const x = t * (this.heights.length - 1),
+        i = Math.min(this.heights.length - 2, Math.floor(x)),
+        q = x - i;
+      p[2] = this.heights[i] * (1 - q) + this.heights[i + 1] * q;
+    }
     target.set(...p);
     if (this.strand >= 0) {
       const d = Math.hypot(this.b[0] - this.a[0], this.b[1] - this.a[1]) || 1,
@@ -298,8 +306,9 @@ class FiberCurve extends RopeCurve {
     r: Rope,
     strand: number,
     public phase: number,
+    heights?: number[],
   ) {
-    super(a, b, r, strand);
+    super(a, b, r, strand, heights);
   }
   getPoint(t: number, target = new T.Vector3()) {
     super.getPoint(t, target);
@@ -312,7 +321,13 @@ class FiberCurve extends RopeCurve {
     return target;
   }
 }
-export function ropeMesh(rope: Rope, a: V3, b: V3, mat: Materials) {
+export function ropeMesh(
+  rope: Rope,
+  a: V3,
+  b: V3,
+  mat: Materials,
+  heights?: number[],
+) {
   const group = new T.Group();
   group.userData = { id: rope.id, kind: "rope" };
   const length = new T.Vector3(...a).distanceTo(new T.Vector3(...b)),
@@ -326,7 +341,7 @@ export function ropeMesh(rope: Rope, a: V3, b: V3, mat: Materials) {
   });
   for (let i = 0; i < 3; i++) {
     const geom = new T.TubeGeometry(
-      new RopeCurve(a, b, rope, i),
+      new RopeCurve(a, b, rope, i, heights),
       segments,
       rope.radius * 0.61,
       10,
@@ -343,7 +358,7 @@ export function ropeMesh(rope: Rope, a: V3, b: V3, mat: Materials) {
     });
     for (let i = 0; i < 6; i++) {
       const geometry = new T.TubeGeometry(
-          new FiberCurve(a, b, rope, i % 3, i * 2.3),
+          new FiberCurve(a, b, rope, i % 3, i * 2.3, heights),
           segments,
           rope.radius * 0.065,
           4,
@@ -456,7 +471,11 @@ export function disposeTree(
         if (!shared.has(m) && !disposed.has(m)) {
           disposed.add(m);
           if ("map" in m) (m as T.MeshStandardMaterial).map?.dispose();
-          if (m instanceof T.MeshStandardMaterial) m.roughnessMap?.dispose();
+          if (
+            m instanceof T.MeshStandardMaterial &&
+            !m.roughnessMap?.userData.shared
+          )
+            m.roughnessMap?.dispose();
           if (m instanceof T.MeshStandardMaterial) m.alphaMap?.dispose();
           if (m instanceof T.MeshPhysicalMaterial) m.clearcoatMap?.dispose();
           m.dispose();

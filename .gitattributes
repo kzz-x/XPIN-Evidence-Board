@@ -1,3 +1,4 @@
 # Preserve verified distribution bytes; review implementation changes in src/.
 releases/XPIN-Evidence-Board-Studio-V4.html -diff -text
 releases/XPIN-Evidence-Board-Studio-V4.1.html -diff -text
+releases/XPIN-Evidence-Board-Studio-V5.html -diff -text

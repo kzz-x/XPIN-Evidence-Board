@@ -1,6 +1,6 @@
 # 从这里开始
 
-适用 Studio V4.1，工程格式 `version: 3`，Agent 描述格式 `xpin-scene/1`。
+适用 Studio V5，工程格式 `version: 3`，Agent 描述格式 `xpin-scene/1`。
 
 | 你想做什么 | 入口 |
 |---|---|
@@ -12,11 +12,11 @@
 
 ## 人类：三步开始
 
-1. 下载仓库 `releases/XPIN-Evidence-Board-Studio-V4.1.html`，保存为 HTML 后用桌面 Edge / Chrome 打开。GitHub 文件页本身不是工作台。
+1. 下载仓库 `releases/XPIN-Evidence-Board-Studio-V5.html`，保存为 HTML 后用桌面 Edge / Chrome 打开。GitHub 文件页本身不是工作台。
 2. 在「午夜档案」里体验，或选「空白调查板」开始；先摆物件，再加图钉／绳／标注，最后编排镜头。
 3. 「保存工程」下载可编辑 JSON；「输出」生成图片或视频。HTML 是软件，JSON 是作品，视频是成片，三者分开保留。
 
-## Agent：四条原生命令
+## Agent：原生制作与检查
 
 在源码仓库运行，首次先 `npm ci`。需要 Node.js 22.12+；本机验收使用 Node 24。
 
@@ -24,8 +24,11 @@
 npm run project -- compose examples/quickstart/scene.json test-results/quickstart/project.json
 npm run project -- validate test-results/quickstart/project.json
 npm run project -- inspect test-results/quickstart/project.json test-results/quickstart/inspect.json
+npm run project -- audit test-results/quickstart/project.json test-results/quickstart/audit.json
 npm run project -- sample test-results/quickstart/project.json 1.1 test-results/quickstart/frame.json
 ```
+
+`audit` 报告数值安全问题；发现 error 时退出码 2，只有 warning 则为 0。按报告修正后重测，不要忽略退出码。详见 [防穿模与运镜规范](PRODUCTION.md)。
 
 这些命令直接运行 TypeScript 编译器、数据模型和时间线引擎，不启动浏览器、不模拟点击。输出只新建；重跑时使用新的输出文件名。自带本地素材，无需联网下载图片。
 

@@ -8,6 +8,7 @@ import {
   validateProject,
   evaluate,
   inspectProject,
+  auditProduction,
   sampleProject,
   type SceneBrief,
 } from "../src/authoring";
@@ -31,6 +32,10 @@ if (JSON.stringify(project) !== before) throw Error("源工程被修改");
 await writeNewJson(resolve(output, "source.project.json"), project);
 await writeNewJson(resolve(output, "revised.project.json"), revised);
 await writeNewJson(resolve(output, "inspect.json"), inspectProject(revised));
+await writeNewJson(
+  resolve(output, "production-audit.json"),
+  auditProduction(revised),
+);
 await writeNewJson(
   resolve(output, "frame-1.1.json"),
   sampleProject(revised, 1.1),

@@ -220,6 +220,7 @@ await test("rotation and scale retain all anchors and drawn annotation", async (
     const s = window.__XPIN.studio;
     s.select([s.p.items[0].id]);
   });
+  await reveal('[data-bind="item.rotationDeg"][type="number"]');
   await page.getByLabel("旋转", { exact: true }).fill("38");
   await page.getByLabel("旋转", { exact: true }).dispatchEvent("change");
   await page.getByLabel("缩放", { exact: true }).fill("1.6");
@@ -249,12 +250,15 @@ await test("light position, target binding and changed shadows affect real pixel
   await reset();
   await page.click('[data-panel="light"]');
   const id = baseline.lights[0].id;
+  await reveal(`[data-select="${id}"]`);
   await page.click(`[data-select="${id}"]`);
+  await reveal('[data-bind="light.hostId"]');
   await page
     .getByLabel("跟随目标", { exact: true })
     .selectOption(baseline.items[4].id);
   await page.waitForTimeout(70);
   const a = await png("light-a");
+  await reveal('[data-bind="settings.keyAzimuth"][type="number"]');
   await page.getByLabel("光线方位", { exact: true }).fill("310");
   await page.getByLabel("光线方位", { exact: true }).dispatchEvent("change");
   await page.waitForTimeout(70);
@@ -393,6 +397,7 @@ await test("native module drag/drop and reusable linked group preset", async () 
   assert.ok(p.ropes.length > baseline.ropes.length);
   const copied = await page.evaluate(() => window.__XPIN.studio.selection);
   assert.ok(p.pins.filter((p) => copied.includes(p.hostId)).length >= 2);
+  await reveal('[data-action="preset"]');
   await page.click('[data-action="preset"]');
   p = await page.evaluate(() => window.__XPIN.project());
   assert.equal(p.presets.length, 1);
@@ -439,6 +444,7 @@ await test("16:9 and 9:16 PNG decode at correct size without editor helpers", as
   assert.equal(wide.readUInt32BE(16), 1920);
   assert.equal(wide.readUInt32BE(20), 1080);
   await page.click('[data-panel="scene"]');
+  await reveal('[data-bind="settings.aspect"]');
   await page.getByLabel("作品画幅", { exact: true }).selectOption("9:16");
   const tall = await png("portrait-1080", 1080);
   assert.equal(tall.readUInt32BE(16), 1080);
@@ -560,3 +566,13 @@ await writeFile(out + "/regression.json", JSON.stringify(report, null, 2));
 console.log(JSON.stringify(report, null, 2));
 await browser.close();
 process.exitCode = results.some((r) => !r.passed) || errors.length ? 1 : 0;
+
+async function reveal(selector) {
+  await page
+    .locator(selector)
+    .first()
+    .evaluate((el) => {
+      for (let d = el.parentElement; d; d = d.parentElement)
+        if (d.tagName === "DETAILS") d.open = true;
+    });
+}

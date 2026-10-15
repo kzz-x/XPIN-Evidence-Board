@@ -16,9 +16,9 @@ npm ci
 npm run native:example -- test-results/native-quickstart
 ```
 
-原生入口为 `src/authoring.ts`；`npm run project -- --help` 查看 compose / validate / inspect / sample。示例生成可编辑工程、增量修改版与时序报告，全程不启动浏览器。最终像素由工作台 WebGL2 输出，当前没有纯 Node 的 PNG／视频渲染 CLI。
+原生入口为 `src/authoring.ts`；`npm run project -- --help` 查看 compose / validate / inspect / sample / audit。示例生成可编辑工程、增量修改版与时序报告，全程不启动浏览器。最终像素由工作台 WebGL2 输出，当前没有纯 Node 的 PNG／视频渲染 CLI。
 
-## 当前入口：Studio V4.1
+## 当前入口：Studio V5
 
 正式产品位于 `src/`：Three.js / WebGL2、PBR 材质、动态投影、深度景深；统一场景与绝对时间线用于编辑、播放和输出。
 
@@ -27,6 +27,8 @@ npm run native:example -- test-results/native-quickstart
 [下载 V4 离线工作台](releases/XPIN-Evidence-Board-Studio-V4.html)。V4 增加多采样、可见景深、窗光、薄纸与纸面画笔、部件动画、实体边框、字体控制及现场录制。
 
 [下载 V4.1 离线工作台](releases/XPIN-Evidence-Board-Studio-V4.1.html)。所有出入场默认柔和淡化，支持画外起终点、四个方向、入场／退场轨道及可视贝塞尔曲线。旧工程直接导入即可使用改进后的默认演出。
+
+[下载 V5 离线工作台](releases/XPIN-Evidence-Board-Studio-V5.html)。统一创作台默认保留自由视角；播放键旁勾选摄影机机位或按 `0` 才监看故事摄影机。物件／镜头共用动画轨道编辑，近景投影升级，新增原生制作安全检查、摄影机曲线、逐镜光圈／拉焦，以及更细的纸张、印相层和固定件材质。
 
 ```sh
 npm ci

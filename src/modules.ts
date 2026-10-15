@@ -135,6 +135,20 @@ export function demoProject(): Project {
   ] as const) {
     const s = makeShot(p, index < 0 ? [] : [p.items[index].id], motion);
     s.duration = 5;
+    s.ease = index === 4 ? "glide" : "smoother";
+    s.moveFraction = 0.82;
+    s.camera.yaw =
+      index < 0 ? 0.08 : index === 1 ? -0.22 : index === 4 ? 0.26 : -0.14;
+    s.camera.pitch = index < 0 ? -0.08 : index === 4 ? -0.2 : -0.12;
+    s.camera.fStop = index < 0 ? 8 : index === 0 ? 2.8 : 4;
+    if (index === 0)
+      s.focusPull = {
+        from: s.camera.distance - 0.35,
+        to: s.camera.distance + 0.08,
+        start: 2.3,
+        duration: 1.7,
+        ease: "smooth",
+      };
     s.title =
       index < 0
         ? "04 / 关系网全局揭示"

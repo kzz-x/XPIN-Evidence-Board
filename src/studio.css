@@ -567,7 +567,7 @@ h2 {
 .section {
   border-top: 1px solid var(--border);
 }
-.section summary {
+.section > summary {
   font-size: 11px;
   padding: 15px 20px;
   color: #bcc2aa;
@@ -575,12 +575,12 @@ h2 {
   list-style: none;
   font-weight: 550;
 }
-.section summary:after {
+.section > summary:after {
   content: "+";
   float: right;
   color: #667b58;
 }
-.section[open] summary:after {
+.section[open] > summary:after {
   content: "−";
 }
 .section-body {
@@ -1131,7 +1131,7 @@ pre {
   .selection-heading {
     padding: 19px 16px 12px;
   }
-  .section summary {
+  .section > summary {
     padding: 14px 16px;
   }
   .section-body {

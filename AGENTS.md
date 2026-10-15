@@ -3,7 +3,7 @@
 ## 目标与基线
 以 [True3D V2](prototypes/XPIN-Evidence-Board-True3D-V2.html) 已可操作的三维调查沙盘为起点，逐阶段升级为高质量、可编辑、可播放的三维叙事工作台。
 
-当前正式入口为 Studio V4.1：`index.html → src/main.ts`。V2/V3 离线版保留为兼容和回退原件。先看 PROGRESS 的真实边界，再看 [ARCHITECTURE](docs/ARCHITECTURE.md)。使用与制作总入口为 [START-HERE](docs/START-HERE.md)。Agent 制作作品应走 [AGENT-NATIVE](docs/AGENT-NATIVE.md) 的 Node CLI / `src/authoring.ts`，不要操作浏览器界面、依赖 `window.__XPIN` 或另建场景入口。最终 WebGL 像素验收／输出与原生数据制作分开说明。
+当前正式入口为 Studio V5：`index.html → src/main.ts`。V2/V3 离线版保留为兼容和回退原件。先看 PROGRESS 的真实边界，再看 [ARCHITECTURE](docs/ARCHITECTURE.md)。使用与制作总入口为 [START-HERE](docs/START-HERE.md)。Agent 制作作品应走 [AGENT-NATIVE](docs/AGENT-NATIVE.md) 的 Node CLI / `src/authoring.ts`，不要操作浏览器界面、依赖 `window.__XPIN` 或另建场景入口。制作前同时阅读 [PRODUCTION](docs/PRODUCTION.md) 的防穿模、时序和运镜规范。用 auditProduction 做原生安全检查，解决错误后交接；不得把采样报告说成完整碰撞／像素通过。最终 WebGL 像素验收／输出与原生数据制作分开说明。
 
 先读 [PROGRESS.md](PROGRESS.md)，根据本轮任务读 [ROADMAP.md](docs/ROADMAP.md) 和 [LOOKDEV.md](docs/LOOKDEV.md)；有关绑定/时间/保存时读 [ENGINE.md](docs/ENGINE.md)，验收时读 [ACCEPTANCE.md](docs/ACCEPTANCE.md)。不必每次加载全部资料。
 

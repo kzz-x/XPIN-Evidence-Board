@@ -103,5 +103,5 @@ export function text(
 ) {
   return `<label class="field"><span>${label}</span>${multiline ? `<textarea aria-label="${label}" data-bind="${bind}" rows="4">${esc(value)}</textarea>` : `<input aria-label="${label}" type="text" data-bind="${bind}" value="${esc(value)}">`}</label>`;
 }
-export const section = (label: string, html: string, open = true) =>
+export const section = (label: string, html: string, open = false) =>
   `<details class="section" ${open ? "open" : ""}><summary>${esc(label)}</summary><div class="section-body">${html}</div></details>`;

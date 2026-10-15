@@ -95,9 +95,45 @@ export function microTexture(
   }
   return c;
 }
+/** Subtle manufactured surfaces, shared linear-data maps (not painted lighting). */
+function finishMap(kind: "paper" | "metal" | "plastic") {
+  const { c, g } = canvas(512, 512),
+    r = seeded(kind === "metal" ? 91 : 173),
+    pixels = g.createImageData(512, 512);
+  for (let i = 0; i < pixels.data.length; i += 4) {
+    const v = Math.round(
+      (kind === "paper" ? 224 : 205) +
+        (r() - 0.5) * (kind === "paper" ? 35 : 24),
+    );
+    pixels.data[i] = pixels.data[i + 1] = pixels.data[i + 2] = v;
+    pixels.data[i + 3] = 255;
+  }
+  g.putImageData(pixels, 0, 0);
+  g.lineWidth = 0.35;
+  for (let i = 0; i < (kind === "metal" ? 1200 : 2200); i++) {
+    const x = r() * 512,
+      y = r() * 512;
+    g.strokeStyle = `rgba(90,90,90,${kind === "metal" ? 0.12 : 0.06})`;
+    g.beginPath();
+    g.moveTo(x, y);
+    g.lineTo(
+      x + (kind === "metal" ? 10 + r() * 120 : r() * 7),
+      y + (kind === "metal" ? 0.2 : (r() - 0.5) * 5),
+    );
+    g.stroke();
+  }
+  const map = texture(c, false);
+  map.wrapS = map.wrapT = T.RepeatWrapping;
+  map.repeat.set(kind === "metal" ? 2 : 4, kind === "metal" ? 2 : 4);
+  map.userData.shared = true;
+  return map;
+}
 export class Materials {
   paper = texture(microTexture("paper"), false);
   rope = texture(microTexture("rope"), false);
+  paperFinish = finishMap("paper");
+  metalFinish = finishMap("metal");
+  plasticFinish = finishMap("plastic");
   boards = new Map<string, T.MeshStandardMaterial>();
   images = new Map<string, HTMLImageElement>();
   corkMaps?: T.Texture[];
@@ -118,13 +154,23 @@ export class Materials {
     color: "#9f1722",
     roughness: 0.26,
     metalness: 0.04,
+    envMapIntensity: 1.2,
     clearcoat: 0.48,
-    clearcoatRoughness: 0.22,
+    clearcoatRoughness: 0.18,
+    roughnessMap: this.plasticFinish,
+    bumpMap: this.plasticFinish,
+    bumpScale: 0.00012,
   });
-  metal = new T.MeshStandardMaterial({
+  metal = new T.MeshPhysicalMaterial({
     color: "#a6aaa5",
     metalness: 0.95,
-    roughness: 0.24,
+    roughness: 0.26,
+    roughnessMap: this.metalFinish,
+    bumpMap: this.metalFinish,
+    bumpScale: 0.00008,
+    envMapIntensity: 1.6,
+    anisotropy: 0.32,
+    anisotropyRotation: 0.45,
   });
   constructor() {
     this.paper.wrapS = this.paper.wrapT = T.RepeatWrapping;
@@ -464,12 +510,23 @@ export class Materials {
         bottom = o.kind === "polaroid" ? 185 : 100;
       rough.g.fillStyle = "#eeeeee";
       rough.g.fillRect(0, 0, 1024, height);
-      rough.g.fillStyle = "#858585";
+      rough.g.fillStyle = "#727272";
       rough.g.fillRect(pad, pad, 1024 - pad * 2, height - pad - bottom);
       coat.g.fillStyle = "#000000";
       coat.g.fillRect(0, 0, 1024, height);
       coat.g.fillStyle = "#ffffff";
       coat.g.fillRect(pad, pad, 1024 - pad * 2, height - pad - bottom);
+      // Emulsion grain only modulates reflectance, keeping the image itself clean.
+      const r = seeded(hash(o.id));
+      for (let i = 0; i < 18000; i++) {
+        rough.g.fillStyle = `rgba(255,255,255,${r() * 0.07})`;
+        rough.g.fillRect(
+          pad + r() * (1024 - 2 * pad),
+          pad + r() * (height - pad - bottom),
+          0.5 + r(),
+          0.5 + r(),
+        );
+      }
       roughnessMap = texture(rough.c, false);
       clearcoatMap = texture(coat.c, false);
     }
@@ -477,12 +534,17 @@ export class Materials {
       map,
       color: "#ffffff",
       roughness: o.roughness ?? (photographic ? 1 : 0.9),
-      roughnessMap,
-      bumpMap: this.paper,
-      bumpScale: (photographic ? 0.0003 : 0.0008) * (o.fiberStrength ?? 1),
-      clearcoat: ["photo", "polaroid"].includes(o.kind) ? 0.16 : 0,
+      roughnessMap: roughnessMap ?? this.paperFinish,
+      bumpMap: photographic ? this.paper : this.paperFinish,
+      bumpScale: (photographic ? 0.00018 : 0.0013) * (o.fiberStrength ?? 1),
+      clearcoat: ["photo", "polaroid"].includes(o.kind) ? 0.32 : 0,
       clearcoatMap,
-      clearcoatRoughness: 0.55,
+      clearcoatRoughness: 0.22,
+      clearcoatRoughnessMap: photographic ? this.plasticFinish : null,
+      envMapIntensity: photographic ? 1.25 : 1,
+      sheen: photographic ? 0 : 0.16,
+      sheenColor: new T.Color("#ddd2bd"),
+      sheenRoughness: 0.85,
       side: T.FrontSide,
       transparent: o.kind === "stamp",
       alphaTest: o.kind === "stamp" ? 0.05 : 0,

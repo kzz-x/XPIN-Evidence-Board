@@ -1,4 +1,4 @@
-# Studio V4.1 维护入口
+# Studio V5 维护入口
 
 正式入口是 `index.html → src/main.ts`。`prototypes/` 中 V2 保持原样，仅用于回退和兼容性回归。
 
@@ -13,9 +13,13 @@
 | `modules.ts` | 模块目录、类别、默认规格、20 秒演示工程 |
 | `migrate.ts` | 非破坏性迁移 V2 JSON，包括嵌入 SVG 素材 |
 | `motion.ts` / `fade.ts` / `dof.ts` | 贝塞尔求值、画外路径、材质淡化及透明度一致的阴影／景深 |
+| `camera-motion.ts` / `camera-editor.ts` | 五次／贝塞尔机位曲线、停留占比、光圈和屈光度拉焦、原生与 UI 共用 |
 | `story.ts` | `evaluate(project,t)`：纯函数求相机、出场、笔迹/绳生长、LightCue |
 | `materials.ts` | 内容贴图、PBR 材质、合法本地资产加载与缓存 |
 | `geometry.ts` | 纸面翘曲、实体固定件、三股绳、细纤维、墨迹几何 |
+| `surface.ts` / `rope-clearance.ts` / `production-audit.ts` | 无 DOM 纸面高度、实体绳避让与非破坏制作安全检查 |
+| `shadow-filter.ts` | 确定性 32 点深度 PCF；柔化按世界尺度换算，与近景范围／分辨率解耦 |
+| `animation-editor.ts` | 物件和镜头面板共用全故事轨道控件 |
 | `renderer.ts` | 唯一 WebGL2 场景、阴影、真实深度景深、拾取、无 UI 输出 |
 | `studio.ts` / `inspector.ts` / `ui.ts` | 鼠标操作、背包、中文属性面板、故事卡、控件模板 |
 | `encode.ts` | 固定时间戳 WebCodecs + Mediabunny 输出 MP4 / WebM |
@@ -52,3 +56,13 @@ npm run standalone
 浏览器测试默认 Windows Edge D3D11，可用 `XPIN_BROWSER`、`XPIN_URL` 和 `XPIN_EVIDENCE_DIR` 配置。均为 Playwright 纯代码测试，不依赖 Computer Use。`test-results/` 不进入版本控制。
 
 `npm run standalone` 将构建 JS、CSS 和贴图打入一个可用 file:// 打开的 HTML。源码开发仍通过 Vite，单文件是分发产物。
+
+## V5 观察与安全边界
+
+`followCamera=false` 默认使用 `view.pose`，播放与选择镜头不改变它。仅摄影机勾选／0 切到 `evaluate` 的摄影机；保存自由视角到 `editorView`，不覆盖 `Project.camera`。`mode` 内部兼容完整布置／时间求值，不再是顶栏产品模块。PNG 遵循当前视角；逐帧视频始终使用故事摄影机。
+
+主光使用按视野收紧、光空间 texel 对齐的阴影范围；影棚 4096、精制 8192（受硬件上限约束），真实投／接影保留。32 点确定性 PCF 处理深度图，世界柔化半径约 softness×0.012，最多 32 texel；这不是面积光接触硬化或路径追踪。聚光仍为独立深度图。
+
+实体绳以 97 个中心线样本抬到可见稳定纸面的安全高度，保留原始 pin 端点和源弯曲数据。变形柔纸、固定件互碰、绳间交叉仍需像素检查；不能把路由辅助称为完整物理模拟。安全检查报告明确 `continuousCollisionVerified:false`，不改源。
+
+V5 机位使用全时段缓动取代提前到达后的硬速度变化，yaw/roll 走最短角。光圈按对数、焦点按屈光度空间衔接；逐镜 focusPull 可独立定时。景深仍为深度 Bokeh，不耦合光圈曝光，也不是物理镜头透射求解。材质增加共享线性微表面图、纸面 sheen、印相层清漆／粗糙度分区、金属方向反射与塑料细节；共享图不在单件释放时销毁。

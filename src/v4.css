@@ -88,3 +88,87 @@ body:has([data-recording="true"]) [data-action="record-stop-top"] {
   fill: #9eaa96;
   font-size: 7px;
 }
+
+/* V5: one workspace, explicit camera monitoring, progressive controls. */
+.workspace-label {
+  color: var(--muted);
+  font-size: 12px;
+  padding: 0 16px;
+  white-space: nowrap;
+}
+.camera-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  color: #d0c7ac;
+  font-size: 11px;
+}
+.camera-option input {
+  accent-color: #c4ad74;
+}
+.camera-option kbd {
+  font: 10px monospace;
+  border: 1px solid #4e5948;
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+.compact-button {
+  font-size: 11px;
+  padding: 7px 9px;
+  white-space: nowrap;
+}
+.animation-shot {
+  margin: 10px 0;
+  border-top: 1px solid #394432;
+  padding-top: 9px;
+}
+.animation-shot > summary,
+.track-row > summary {
+  cursor: pointer;
+  line-height: 1.65;
+  color: #d2c6a3;
+  font-size: 12px;
+}
+.animation-shot small,
+.track-row summary small {
+  display: block;
+  color: #93a080;
+  font-size: 10px;
+}
+.track-row {
+  padding: 10px;
+}
+.track-body {
+  padding-top: 12px;
+}
+.track-row .section {
+  margin: 8px -3px;
+}
+.track-row .section summary {
+  font-size: 11px;
+}
+.audit-list p {
+  padding: 10px 0;
+  border-bottom: 1px solid #3b4435;
+  font-size: 11px;
+  line-height: 1.7;
+}
+.audit-list b {
+  color: #d0ad76;
+  overflow-wrap: anywhere;
+}
+.field .field {
+  margin-top: 10px;
+}
+@media (max-width: 1300px) {
+  .workspace-label {
+    display: none;
+  }
+  .camera-option {
+    font-size: 10px;
+  }
+  .timeline-head {
+    gap: 8px;
+  }
+}

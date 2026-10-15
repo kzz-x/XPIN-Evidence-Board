@@ -1,3 +1,6 @@
+import { cameraCurve, cameraCurvePreview } from "./camera-motion";
+import { auditProduction } from "./production-audit";
+import { liftToSurface } from "./surface";
 import "./v4.css";
 import { compileScene } from "./compose";
 import {
@@ -84,6 +87,8 @@ export class Studio {
   view: BoardRenderer;
   ready: Promise<void>;
   mode: Mode = "build";
+  followCamera = false;
+  productionReport?: ReturnType<typeof auditProduction>;
   tool: Tool = "select";
   selection: string[] = [];
   selectedShot?: string;
@@ -177,13 +182,17 @@ export class Studio {
       "afterend",
       `<div class="record-box"><h3>现场录制</h3><p>记录当前画面与手动运镜，包含已导入音轨。停止后下载 WebM。</p><div class="button-grid">${button("开始录制", "record-start", "film")}${button("停止并保存", "record-stop", "save")}</div><output id="record-status">未录制</output></div>`,
     );
-    this.view = new BoardRenderer(this.el("#viewport"), p.camera);
+    this.view = new BoardRenderer(
+      this.el("#viewport"),
+      p.editorView ?? p.camera,
+    );
     this.ready = this.view.sync(p);
     this.renderLibrary();
     this.renderInspector();
     this.renderTimeline();
     this.bind();
     this.store.subscribe(() => {
+      this.productionReport = undefined;
       this.syncing = true;
       void this.view.sync(this.p).then(() => (this.syncing = false));
       this.selection = this.selection.filter((id) => this.exists(id));
@@ -210,7 +219,16 @@ export class Studio {
         select: (ids: string[]) => this.select(ids),
         seek: (t: number) => this.seek(t),
         setMode: (m: Mode) => this.setMode(m),
-        png: (w = 1920) => this.view.png(this.p, this.time, this.mode, w),
+        png: (w = 1920) =>
+          this.view.png(
+            this.p,
+            this.time,
+            this.mode,
+            w,
+            1,
+            undefined,
+            this.followCamera ? undefined : this.view.pose,
+          ),
       },
     });
   }
@@ -230,11 +248,11 @@ export class Studio {
     ].some((o) => o.id === id);
   }
   shell() {
-    this.root.innerHTML = `<header class="topbar"><div class="brand"><span class="brand-icon">X<span>•</span></span><div><strong>XPIN <span>Evidence Board</span></strong><small>三维叙事工作台 <i>STUDIO / 04.1</i></small></div></div><nav class="modes" aria-label="工作模式">${["build", "director", "play"].map((m, i) => `<button data-mode="${m}" class="${!i ? "active" : ""}">${icon(["group", "camera", "play"][i])}${["搭建", "导演", "播放"][i]}</button>`).join("")}</nav><div class="project-title">${esc(this.p.name)}</div><div class="top-actions"><span id="saved" class="saved">本地工程</span>${button("撤销", "undo", "undo", "icon-button")}${button("重做", "redo", "redo", "icon-button")}${button("打开", "import", "folder")}${button("保存工程", "save", "save")}${button("输出", "output", "export", "primary")}</div></header>
+    this.root.innerHTML = `<header class="topbar"><div class="brand"><span class="brand-icon">X<span>•</span></span><div><strong>XPIN <span>Evidence Board</span></strong><small>三维叙事工作台 <i>STUDIO / 05</i></small></div></div><span class="workspace-label">统一创作台</span><div class="project-title">${esc(this.p.name)}</div><div class="top-actions"><span id="saved" class="saved">本地工程</span>${button("撤销", "undo", "undo", "icon-button")}${button("重做", "redo", "redo", "icon-button")}${button("打开", "import", "folder")}${button("保存工程", "save", "save")}${button("输出", "output", "export", "primary")}</div></header>
  <div class="workspace"><aside class="library-panel"><div class="panel-heading"><small>YOUR TOOLKIT</small><div><h2>模块背包</h2><button data-action="favorites" class="icon-button" title="只看收藏">${icon("star")}</button></div><label class="search">${icon("search")}<input aria-label="搜索模块" id="search" placeholder="寻找下一条线索…"></label></div><div class="category-tabs" id="categories"></div><div id="library" class="library"></div><div class="library-bottom"><div class="eyebrow">创作起点</div>${button("午夜档案", "demo", "folder")}${button("空白调查板", "new", "plus")}<p>拖入模块，开始构建故事。<br>素材和工程保存在本机。</p></div></aside>
  <main id="stage" class="stage"><div id="viewport" class="viewport"></div><div id="loading">正在建立三维档案室…</div><div class="stage-caption"><span class="tiny-dot"></span><span>CASE 047 / THE MIDNIGHT ARCHIVE</span></div><div class="stage-top-right"><span id="render-status">真实三维 / WebGL2</span><button data-action="helpers" class="icon-button" title="显示或隐藏灯光辅助">${icon("light")}</button></div><div class="tools" aria-label="搭建工具">${(["select", "rotate", "scale", "pin", "rope", "mark", "light", "target"] as Tool[]).map((t, i) => `<button data-tool="${t}" title="${["移动 / V", "旋转 / R", "缩放 / E", "图钉 / P", "拉绳 / C", "手绘 / M", "添加追光 / L", "指定追光落点"][i]}" class="${!i ? "active" : ""}">${icon(t === "select" ? "move" : t === "target" ? "focus" : t)}</button>`).join("")}<hr>${button("全览", "fit", "grid", "icon-button")}${button("特写", "focus", "focus", "icon-button")}</div><div class="stage-bottom"><div id="hint" class="interaction-hint">拖动摆放 · 滚轮缩放 · Alt 拖动环视 · 空格平移</div><div class="view-pill"><button data-action="front">正视</button><button data-action="angle">斜视</button><span id="fps">—</span></div></div><div id="box-select" class="box-select" hidden></div><div id="drop-preview" class="drop-preview" hidden>释放以放置模块</div><div id="toast" class="toast" role="status"></div></main>
  <aside class="inspector-panel"><div class="inspector-tabs"><button data-panel="object" class="active">物件</button><button data-panel="light">布光</button><button data-panel="scene">场景</button><button data-panel="shot">镜头</button></div><div id="inspector"></div></aside></div>
- <footer class="timeline"><div class="timeline-head"><div><small>STORY SEQUENCE</small><b>故事编排</b></div><button data-action="play" class="play-button" id="play-button">${icon("play")}播放故事</button><button data-action="reset" class="icon-button" title="回到开始">↤</button><input id="scrub" type="range" min="0" max="20" step="0.001" value="0" aria-label="播放头"><span id="timecode">00:00.00 / 00:20</span>${button("加入镜头", "shot", "plus")}</div><div id="shots" class="shots"></div></footer>
+ <footer class="timeline"><div class="timeline-head"><div><small>STORY SEQUENCE</small><b>故事编排</b></div><button data-action="play" class="play-button" id="play-button">${icon("play")}播放故事</button><label class="camera-option"><input id="follow-camera" type="checkbox" aria-label="按摄影机机位播放">摄影机机位 <kbd>0</kbd></label><button data-action="rest-layout" class="compact-button" title="保留自由视角，显示全部原始布置">完整布置</button><button data-action="reset" class="icon-button" title="回到开始">↤</button><input id="scrub" type="range" min="0" max="20" step="0.001" value="0" aria-label="播放头"><span id="timecode">00:00.00 / 00:20</span>${button("加入镜头", "shot", "plus")}</div><div id="shots" class="shots"></div></footer>
  <dialog id="output-dialog"><div class="dialog-head"><div><small>DELIVER YOUR STORY</small><h2>输出作品</h2></div><button data-action="close-dialog" class="icon-button">${icon("close")}</button></div><p>与当前三维画面使用同一场景、灯光、景深和时间轴。输出隐藏编辑辅助。</p><div class="export-options"><label class="field"><span>分辨率</span><select id="export-size"><option value="1920">1080p / 长边 1920</option><option value="2560">1440p / 长边 2560</option><option value="3840">4K / 长边 3840</option></select></label><label class="field"><span>视频帧率</span><select id="export-fps"><option value="24">24 fps</option><option value="30">30 fps</option><option value="60">60 fps</option></select></label></div><div class="dialog-actions">${button("当前帧 PNG", "png", "photo", "primary")}${button("故事视频 WebM", "video", "film")}</div><progress id="export-progress" value="0" max="1" hidden></progress><p class="helper" id="export-note">VP9 / VP8 WebM。声音可在场景面板导入。工程 JSON 内嵌素材。</p></dialog><input type="file" id="project-file" accept=".json" hidden><input type="file" id="image-file" accept="image/png,image/jpeg,image/webp,image/svg+xml" hidden><input type="file" id="audio-file" accept="audio/*" hidden>`;
   }
   renderLibrary() {
@@ -293,17 +311,26 @@ export class Studio {
     ];
     for (const d of this.el("#inspector").querySelectorAll("details")) {
       this.inspectorDetails.set(
-        this.displayedPanel + "/" + d.querySelector("summary")?.textContent,
+        this.displayedPanel +
+          "/" +
+          (d.dataset.detailKey ?? d.querySelector("summary")?.textContent),
         d.open,
       );
     }
+    const previousContext = this.displayedPanel;
     this.el("#inspector").innerHTML = inspector(this);
-    this.displayedPanel = this.panel;
+    this.displayedPanel = this.panel + "/" + this.selection.join(",");
+    if (previousContext !== this.displayedPanel)
+      this.el(".inspector-panel").scrollTop = 0;
     for (const d of this.el("#inspector").querySelectorAll("details")) {
       const saved = this.inspectorDetails.get(
-        this.panel + "/" + d.querySelector("summary")?.textContent,
+        this.displayedPanel +
+          "/" +
+          (d.dataset.detailKey ?? d.querySelector("summary")?.textContent),
       );
       if (saved !== undefined) d.open = saved;
+      else if (d === this.el("#inspector").querySelector("details.section"))
+        d.open = true;
     }
     this.root
       .querySelectorAll("[data-panel]")
@@ -319,6 +346,7 @@ export class Studio {
     return (
       this.p.items.find((o) => o.id === id)?.title ??
       this.p.lights.find((l) => l.id === id)?.name ??
+      this.p.shots.find((s) => s.id === id)?.title ??
       (this.p.ropes.some((r) => r.id === id)
         ? "红绳关系"
         : this.p.pins.some((p) => p.id === id)
@@ -342,6 +370,10 @@ export class Studio {
     this.root.addEventListener("click", (e) => this.click(e));
     this.root.addEventListener("change", (e) => {
       const input = e.target as HTMLInputElement;
+      if (input.id === "follow-camera") {
+        this.setCameraFollow(input.checked);
+        return;
+      }
       if (input.dataset.bind) {
         this.store.begin();
         this.applyBinding(input);
@@ -384,7 +416,9 @@ export class Studio {
         this.time = 0;
         this.selection = [];
         this.store.replace(upgrade(p));
-        this.view.pose = clone(p.camera);
+        this.view.pose = clone(p.editorView ?? p.camera);
+        this.setCameraFollow(false);
+        this.setMode("build");
         this.toast("工程与内嵌素材已恢复");
       } catch (e) {
         this.toast(String(e));
@@ -494,7 +528,7 @@ export class Studio {
       "wheel",
       (e) => {
         e.preventDefault();
-        if (this.mode !== "build") return;
+        this.releaseCamera(true);
         const before = this.view.boardPoint(e.clientX, e.clientY, 0);
         this.view.pose.distance = clamp(
           this.view.pose.distance * Math.exp(e.deltaY * 0.001),
@@ -554,6 +588,10 @@ export class Studio {
         this.select([]);
       }
       if (e.key === "Enter") this.togglePlay();
+      if (!e.repeat && (e.code === "Digit0" || e.code === "Numpad0")) {
+        e.preventDefault();
+        this.setCameraFollow(!this.followCamera);
+      }
     });
     document.addEventListener("keyup", (e) => {
       if (e.code === "Space") this.space = false;
@@ -629,11 +667,7 @@ export class Studio {
     if (shot) {
       this.selectedShot = shot;
       this.panel = "shot";
-      this.setMode("director");
-      this.seek(
-        this.shotStart(shot) +
-          this.p.shots.find((s) => s.id === shot)!.duration * 0.7,
-      );
+
       this.renderInspector();
       this.renderTimeline();
       return;
@@ -647,13 +681,30 @@ export class Studio {
       const id = data(key);
       if (id) {
         this.store.edit((p) => {
-          const s = p.shots.find((s) => s.id === this.selectedShot)!;
+          const s = p.shots.find((s) =>
+            key === "remove-action"
+              ? s.actions.some((a) => a.id === id)
+              : s.cues.some((c) => c.id === id),
+          );
+          if (!s) return;
           if (key === "remove-action")
             s.actions = s.actions.filter((a) => a.id !== id);
           else s.cues = s.cues.filter((c) => c.id !== id);
         });
         return;
       }
+    }
+    const preview = data("preview-action");
+    if (preview) {
+      const shot = this.p.shots.find((s) =>
+        s.actions.some((a) => a.id === preview),
+      );
+      const a = shot?.actions.find((a) => a.id === preview);
+      if (shot && a) {
+        this.selectedShot = shot.id;
+        this.seek(this.shotStart(shot.id) + a.start + a.duration * 0.5);
+      }
+      return;
     }
     const action = data("action");
     if (action) void this.action(action);
@@ -665,11 +716,10 @@ export class Studio {
     this.view.updateGizmos(this.p);
     if (ids.some((id) => this.p.lights.some((l) => l.id === id)))
       this.panel = "light";
-    else if (this.panel !== "shot") this.panel = "object";
+    else this.panel = "object";
     this.renderInspector();
   }
   setTool(tool: Tool) {
-    if (this.mode !== "build") this.setMode("build");
     this.tool = tool;
     if (tool !== "rope") this.ropeStart = undefined;
     this.root
@@ -692,6 +742,20 @@ export class Studio {
       this.renderInspector();
     }
   }
+  setCameraFollow(enabled: boolean) {
+    this.followCamera = enabled;
+    this.el<HTMLInputElement>("#follow-camera").checked = enabled;
+    this.root.dataset.camera = enabled ? "story" : "user";
+    if (enabled && this.mode === "build") this.mode = "director";
+    this.root.dataset.mode = this.mode;
+    this.view.mode = this.mode;
+    this.layoutViewport();
+  }
+  releaseCamera(fromCurrent = false) {
+    if (!this.followCamera) return;
+    if (fromCurrent) this.view.pose = clone(evaluate(this.p, this.time).camera);
+    this.setCameraFollow(false);
+  }
   setMode(mode: Mode) {
     this.stop();
     this.mode = mode;
@@ -711,7 +775,7 @@ export class Studio {
   layoutViewport() {
     const v = this.el("#viewport"),
       s = this.el("#stage");
-    if (this.mode === "build" && !this.liveRecording) {
+    if (!this.followCamera && !this.liveRecording) {
       v.style.width = "100%";
       v.style.height = "100%";
     } else {
@@ -725,6 +789,7 @@ export class Studio {
     this.view?.resize();
   }
   add(kind: Kind, pos: V3) {
+    this.releaseCamera(true);
     this.setMode("build");
     if (kind === "pin") {
       this.setTool("pin");
@@ -745,7 +810,14 @@ export class Studio {
     let id = "";
     this.store.edit((p) => {
       const host = p.items.find((o) => o.id === hostId),
-        local = host ? worldToLocal(host, point) : clone(point);
+        local = host
+          ? worldToLocal(
+              this.mode === "build"
+                ? host
+                : evaluate(p, this.time).transforms.get(host.id)!,
+              point,
+            )
+          : clone(point);
       local[2] = 0.025;
       const pin = { id: uid("pin"), hostId, local, color: "#a52027" };
       id = pin.id;
@@ -788,7 +860,32 @@ export class Studio {
       this.store.edit((p) => boardFit(p));
       return;
     }
-    if (action === "entrance") {
+    if (action === "lift-surface") {
+      this.store.edit((p) =>
+        this.selection.forEach((id) => liftToSurface(p, id)),
+      );
+      this.toast("已将选中物件抬至其他纸面上方；请检查组合关系");
+      return;
+    }
+    if (action === "production-audit") {
+      const report = auditProduction(this.p);
+      this.productionReport = report;
+      this.renderInspector();
+      this.toast(`检查完成：${report.issues.length} 项待复核，非完整碰撞验收`);
+      return;
+    }
+    if (["front", "angle", "fit", "focus", "board-fit-view"].includes(action))
+      this.releaseCamera(true);
+    if (action === "rest-layout") {
+      this.setMode("build");
+      this.updateTime();
+      return;
+    }
+    if (
+      action === "entrance" ||
+      action === "object-in" ||
+      action === "object-out"
+    ) {
       const id = this.selection[0];
       if (!id) return;
       let shot =
@@ -804,15 +901,16 @@ export class Studio {
           type:
             p.items.find((o) => o.id === id)?.entrance ??
             animationOptions(p, id)[0][0],
-          start: 0.1,
-          duration: 1.1,
+          phase: action === "object-out" ? "out" : "in",
+          start:
+            action === "object-out" ? Math.max(0, shot.duration - 1.8) : 0.1,
+          duration: 1.8,
           strength: 1,
         });
         this.selectedShot = shot.id;
       });
-      this.panel = "shot";
       this.renderInspector();
-      this.toast("部件专属动画已加入镜头");
+      this.toast("部件动画已加入镜头，可在物件和镜头面板编辑");
       return;
     }
     if (action === "fonts") {
@@ -957,6 +1055,7 @@ export class Studio {
     }
     if (action === "new" || action === "demo") {
       this.stop();
+      this.setCameraFollow(false);
       this.time = 0;
       this.selection = [];
       this.store.replace(action === "demo" ? demoProject() : emptyProject());
@@ -968,7 +1067,7 @@ export class Studio {
     }
     if (action === "save") {
       const p = clone(this.p);
-      p.camera = clone(this.view.pose);
+      p.editorView = clone(this.view.pose);
       download(
         new Blob([JSON.stringify(p, null, 2)], { type: "application/json" }),
         `XPIN-${p.name.replace(/[\\/:*?"<>|]/g, "-")}.json`,
@@ -1029,6 +1128,7 @@ export class Studio {
                   "preview"
                 ? "draft"
                 : "studio",
+            this.followCamera ? undefined : this.view.pose,
           ),
           `XPIN-${this.time.toFixed(2)}s.png`,
         );
@@ -1155,16 +1255,57 @@ export class Studio {
     const shot =
       this.p.shots.find((s) => s.id === this.selectedShot) ?? this.p.shots[0];
     if (!shot) return;
+    if (action === "focus-selected") {
+      const f = evaluate(
+          this.p,
+          this.shotStart(shot.id) + shot.duration - 0.00001,
+        ),
+        tr = f.transforms.get(this.selection[0]);
+      if (!tr) {
+        this.toast("先选中要对焦的纸张或物件");
+        return;
+      }
+      const cam = f.camera,
+        back = new T.Vector3(
+          Math.sin(cam.yaw) * Math.cos(cam.pitch),
+          Math.sin(cam.pitch),
+          Math.cos(cam.yaw) * Math.cos(cam.pitch),
+        ),
+        depth =
+          cam.distance -
+          new T.Vector3(...tr.position)
+            .sub(new T.Vector3(...cam.target))
+            .dot(back);
+      this.store.edit(() => {
+        shot.camera.focusDistance = Math.max(0.1, depth);
+        if (shot.focusPull) shot.focusPull.to = shot.camera.focusDistance;
+        shot.manualCamera = true;
+      });
+      this.toast("已记录此镜头的选中物件焦点");
+      return;
+    }
     if (action === "capture-camera") {
       this.store.edit(() => {
-        shot.camera = clone(this.view.pose);
+        shot.camera = {
+          ...clone(
+            this.followCamera
+              ? evaluate(this.p, this.time).camera
+              : this.view.pose,
+          ),
+          fStop: shot.camera.fStop,
+          focusDistance: shot.camera.focusDistance,
+        };
         shot.manualCamera = true;
       });
       return;
     }
     if (action === "reframe") {
       this.store.edit(() => {
-        shot.camera = poseFor(this.p, shot.targetIds, shot.motion);
+        shot.camera = {
+          ...poseFor(this.p, shot.targetIds, shot.motion),
+          fStop: shot.camera.fStop,
+          focusDistance: shot.camera.focusDistance,
+        };
         shot.manualCamera = false;
       });
       return;
@@ -1283,12 +1424,15 @@ export class Studio {
     if (type === "shot")
       target = this.p.shots.find((s) => s.id === this.selectedShot);
     if (type === "action" || type === "cue") {
-      const child = parts.shift(),
-        s = this.p.shots.find((s) => s.id === this.selectedShot);
+      const child = parts.shift();
       target =
         type === "action"
-          ? s?.actions.find((a) => a.id === child)
-          : s?.cues.find((a) => a.id === child);
+          ? this.p.shots.flatMap((s) => s.actions).find((a) => a.id === child)
+          : this.p.shots.flatMap((s) => s.cues).find((a) => a.id === child);
+    }
+    if (type === "workspace") {
+      if (input.value) this.selectedShot = input.value;
+      return;
     }
     if (!target) return;
     let value: any =
@@ -1332,6 +1476,55 @@ export class Studio {
       target.targetId = value || undefined;
       return;
     }
+    if (type === "shot") {
+      if (last === "autoFocus") {
+        if (value) delete target.camera.focusDistance;
+        else target.camera.focusDistance = target.camera.distance;
+        return;
+      }
+      if (last === "hasFocusPull") {
+        target.focusPull = value
+          ? {
+              from: Math.max(0.1, target.camera.distance - 0.6),
+              to: target.camera.distance + 0.6,
+              start: Math.min(0.5, target.duration * 0.15),
+              duration: Math.max(0.05, Math.min(2, target.duration * 0.6)),
+              ease: "smooth",
+            }
+          : undefined;
+        return;
+      }
+      if (
+        last === "ease" &&
+        parts.length === 1 &&
+        value === "custom" &&
+        !target.bezier
+      )
+        target.bezier = [...cameraCurve({ ...target, ease: "glide" })];
+      if (parts[0] === "bezier") {
+        target.bezier ??= [...cameraCurve(target)];
+        value = clamp(value, 0, 1);
+      }
+      if (last === "moveFraction") value = clamp(value, 0.1, 1);
+      if (last === "fStop") value = clamp(value, 0.8, 22);
+      if (
+        ["focusDistance", "from", "to"].includes(last) &&
+        (parts[0] === "focusPull" || parts[0] === "camera")
+      )
+        value = Math.max(0.1, value);
+    }
+    if (type === "action" && last === "shotId") {
+      const from = this.p.shots.find((s) =>
+          s.actions.some((a) => a.id === target.id),
+        ),
+        to = this.p.shots.find((s) => s.id === value);
+      if (from && to && from !== to) {
+        from.actions = from.actions.filter((a) => a.id !== target.id);
+        to.actions.push(target);
+        this.selectedShot = to.id;
+      }
+      return;
+    }
     if (type === "action") {
       if (parts[0] === "bezier" && !target.bezier)
         target.bezier = [...actionCurve(target)];
@@ -1344,8 +1537,8 @@ export class Studio {
     target[last] = value;
     if (type === "action") {
       const a = this.p.shots
-        .find((s) => s.id === this.selectedShot)
-        ?.actions.find((a) => a.id === input.dataset.bind!.split(".")[1]);
+        .flatMap((s) => s.actions)
+        .find((a) => a.id === input.dataset.bind!.split(".")[1]);
       if (a)
         this.root
           .querySelector(`[data-curve="${a.id}"]`)
@@ -1356,12 +1549,22 @@ export class Studio {
         : [];
       if (graphs.length > 1) graphs[0].remove();
     }
+    if (type === "shot") {
+      const shot = this.p.shots.find((s) => s.id === this.selectedShot);
+      const graph = shot
+        ? this.root.querySelector(`[data-camera-curve="${shot.id}"]`)
+        : null;
+      if (shot && graph) graph.outerHTML = cameraCurvePreview(shot);
+    }
     if (type === "settings" && last === "aspect") {
       this.p.camera = poseFor(this.p, [], "overview");
       for (const shot of this.p.shots)
         if (!shot.manualCamera)
-          shot.camera = poseFor(this.p, shot.targetIds, shot.motion);
-      this.view.pose = clone(this.p.camera);
+          shot.camera = {
+            ...poseFor(this.p, shot.targetIds, shot.motion),
+            fStop: shot.camera.fStop,
+            focusDistance: shot.camera.focusDistance,
+          };
       this.toast("自动镜头已适配画幅，手动机位继续保留");
     }
     if (type === "light" && parts[0] === "target")
@@ -1453,13 +1656,10 @@ export class Studio {
   }
   down(e: PointerEvent) {
     if (this.busy) return;
-    if (this.mode !== "build") {
-      const h = this.view.pick(e.clientX, e.clientY);
-      if (h) this.select([h.id]);
-      return;
-    }
     e.preventDefault();
     this.stop();
+    if (e.altKey || e.button === 1 || this.space || e.button === 2)
+      this.releaseCamera(true);
     this.view.renderer.domElement.setPointerCapture(e.pointerId);
     const hit = this.view.pick(e.clientX, e.clientY),
       point = this.view.boardPoint(e.clientX, e.clientY) ?? [0, 0, 0.04],
@@ -1479,7 +1679,10 @@ export class Studio {
       return;
     }
     if (this.tool === "pin") {
-      this.addPin(point, hit?.kind === "item" ? hit.id : undefined);
+      this.addPin(
+        hit?.point ?? point,
+        hit?.kind === "item" ? hit.id : undefined,
+      );
       return;
     }
     if (this.tool === "light") {
@@ -1520,7 +1723,14 @@ export class Studio {
     }
     if (this.tool === "mark") {
       const host = this.p.items.find((o) => o.id === hit?.id),
-        p = host ? worldToLocal(host, hit?.point ?? point) : clone(point);
+        p = host
+          ? worldToLocal(
+              this.mode === "build"
+                ? host
+                : evaluate(this.p, this.time).transforms.get(host.id)!,
+              hit?.point ?? point,
+            )
+          : clone(point);
       p[2] = 0.025;
       this.drag = { ...base, kind: "mark", hostId: host?.id, points: [p] };
       return;
@@ -1605,7 +1815,12 @@ export class Studio {
       point = this.view.boardPoint(
         e.clientX,
         e.clientY,
-        hostPlane ? hostPlane.position[2] + 0.015 : 0.006,
+        hostPlane
+          ? (this.mode === "build"
+              ? hostPlane
+              : evaluate(this.p, this.time).transforms.get(hostPlane.id)!
+            ).position[2] + 0.015
+          : 0.006,
       ) ?? [0, 0, 0.04];
     if (!d) {
       if (this.tool === "rope" && this.ropeStart) {
@@ -1651,13 +1866,18 @@ export class Studio {
     }
     if (d.kind === "mark") {
       const host = this.p.items.find((o) => o.id === d.hostId),
-        local = host ? worldToLocal(host, point) : clone(point);
+        tr = host
+          ? this.mode === "build"
+            ? host
+            : evaluate(this.p, this.time).transforms.get(host.id)!
+          : undefined,
+        local = tr ? worldToLocal(tr, point) : clone(point);
       local[2] = 0.026;
       const last = d.points!.at(-1)!;
       if (Math.hypot(local[0] - last[0], local[1] - last[1]) > 0.025)
         d.points!.push(local);
       this.drawDraft(
-        d.points!.map((v) => (host ? localToWorld(host, v) : v)),
+        d.points!.map((v) => (tr ? localToWorld(tr, v) : v)),
         this.brush.color,
       );
       return;
@@ -1861,8 +2081,9 @@ export class Studio {
         this.p,
         this.time,
         this.mode,
-        undefined,
+        this.followCamera ? undefined : this.view.pose,
         this.liveRecording,
+        !this.playing && !this.followCamera,
       );
     if (this.view.gizmoLight === "hidden") this.view.helpers.visible = false;
     this.recorder?.capture(now);
@@ -1881,7 +2102,7 @@ export class Studio {
     this.el("#saved").textContent = "保存中…";
     this.savedTimer = window.setTimeout(() => {
       const p = clone(this.p);
-      p.camera = clone(this.view.pose);
+      p.editorView = clone(this.view.pose);
       void autosave(p).then(
         () => (this.el("#saved").textContent = "已本地保存"),
         () => {

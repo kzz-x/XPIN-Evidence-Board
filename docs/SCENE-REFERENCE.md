@@ -9,7 +9,9 @@
 | SceneBrief | `format: "xpin-scene/1"` | 较短的描述／增量指令，需经编译器填默认值 |
 | Project | `version: 3` | 完整可编辑工程，含全部集合、设置、机位及内嵌素材 |
 
-不要把完整工程只改一个 `format` 就当描述；也不要把描述只加 `version` 就当工程。CLI `compose` 读取描述；`validate/inspect/sample` 读取完整工程。
+不要把完整工程只改一个 `format` 就当描述；也不要把描述只加 `version` 就当工程。CLI `compose` 读取描述；`validate/inspect/sample/audit` 读取完整工程。
+
+V5 完整工程可选 `editorView: Pose` 保存自由观察视角；它不是初始作品机位，不参与 `evaluate` 或故事视频输出。`camera` 仍是故事过渡起点。
 
 ## 2. 坐标、角度与时间
 
@@ -114,3 +116,19 @@ V4.1 可选：`phase: in|out`、`ease: cinematic|smooth|gentle|accelerate|linear
 | 把 sample 的 position 写回源 | 会污染原布局；采样结果用于检查，不是源数据 |
 
 集合删除、重排和追加复杂轨道时，直接克隆完整工程，使用原生模型函数或明确数组操作，再 `validateProject` 和写入新文件。保持源文件、稳定 ID、素材和未授权修改的手动工作。
+
+## V5 摄影机曲线与镜内光学
+
+`Pose` 可选 `fStop`（0.8–22，省略为 4）、`focusDistance`（≥0.1 场景单位，省略自动对焦观看目标并加场景 focusOffset）。镜头间按曲线衔接光圈与焦点，焦点在屈光度空间插值。它是实时深度 Bokeh 模型，光圈不改变曝光，不是完整薄透镜／镜头像差模拟。
+
+`Shot.ease` 支持 `smooth/smoother/cinematic/glide/linear/custom`。smooth 和 smoother 均使用端点速度／加速度为零的五次曲线；新镜头默认 smoother。`bezier:[x1,y1,x2,y2]` 四项均 0–1，custom 时生效。`moveFraction` 为 0.1–1，默认 0.85；其后保留到达姿态，给观众阅读。
+
+镜内拉焦可选 `focusPull:{from,to,start,duration,ease}`，from/to 是正的对焦距离，start 为镜内秒数，duration>0，ease 使用 cinematic/smooth/gentle/accelerate/linear。它覆盖该镜头普通对焦距离；下一镜从其结束距离衔接。需要动态目标位置时由 Agent 先在合适时刻取样，再明确填距离；当前没有随目标自动关键帧追焦或焦点路径曲线。
+
+```json
+{"id":"detail", "duration":6, "targetIds":["file-b"], "motion":"focus",
+ "ease":"smoother", "moveFraction":0.7,
+ "camera":{"target":[2,0.4,0.1],"distance":14,"yaw":-0.22,"pitch":-0.12,
+   "roll":0,"focal":52,"fStop":2.8},
+ "focusPull":{"from":13.4,"to":14,"start":2.8,"duration":1.6,"ease":"smooth"}}
+```

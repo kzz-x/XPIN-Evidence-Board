@@ -160,3 +160,21 @@ test("legacy compose uses the same native loader and rejects invalid references 
   assert.notEqual(bad.status, 0);
   await assert.rejects(access(badOut));
 });
+
+test("native audit writes actionable report, exits 2 on collision and preserves source", async () => {
+  const dir = await directory(),
+    p = await fixture();
+  p.items[1].position = [...p.items[0].position];
+  p.items[1].paperCurl = 0;
+  p.items[0].paperCurl = 0;
+  const source = resolve(dir, "source.json"),
+    report = resolve(dir, "audit.json");
+  await writeNewJson(source, p);
+  const before = await readFile(source);
+  const r = run("scripts/project.ts", "audit", source, report);
+  assert.equal(r.status, 2, r.stderr);
+  const a = JSON.parse(await readFile(report, "utf8"));
+  assert.ok(a.issues.some((i: { severity: string }) => i.severity === "error"));
+  assert.equal(a.renderValidated, false);
+  assert.deepEqual(await readFile(source), before);
+});

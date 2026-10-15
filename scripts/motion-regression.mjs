@@ -251,6 +251,10 @@ try {
     return { difference, distinctStates: true };
   });
   await test("curve selector, live custom handles, direction and fade sliders are editable and undoable", async () => {
+    await page.locator('[data-bind="action.enter.ease"]').evaluate((el) => {
+      for (let d = el.parentElement; d; d = d.parentElement)
+        if (d.tagName === "DETAILS") d.open = true;
+    });
     await page.selectOption('[data-bind="action.enter.ease"]', "custom");
     const graph = await page
       .locator('[data-curve="enter"] polyline')

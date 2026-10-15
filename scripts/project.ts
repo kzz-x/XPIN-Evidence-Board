@@ -1,4 +1,8 @@
-import { inspectProject, sampleProject } from "../src/authoring";
+import {
+  inspectProject,
+  sampleProject,
+  auditProduction,
+} from "../src/authoring";
 import { compileFile, readProject, writeNewJson } from "./lib/project-files";
 
 const help = `XPIN 原生工程工具（Node，无浏览器）
@@ -6,6 +10,7 @@ npm run project -- compose scene.json output.project.json [source.project.json]
 npm run project -- validate project.json
 npm run project -- inspect project.json [report.json]
 npm run project -- sample project.json seconds [frame.json]
+npm run project -- audit project.json [audit.json]
 所有输出文件只新建，不覆盖。inspect 的 warnings 需人工判断，验证通过不代表视觉验收。`;
 async function main() {
   const [command, file, arg, extra, ...rest] = process.argv.slice(2);
@@ -34,6 +39,13 @@ async function main() {
         renderValidated: false,
       }),
     );
+    return;
+  }
+  if (command === "audit" && !extra) {
+    const report = auditProduction(p);
+    if (arg) await writeNewJson(arg, report);
+    else console.log(JSON.stringify(report, null, 2));
+    if (report.issues.some((i) => i.severity === "error")) process.exitCode = 2;
     return;
   }
   if (command === "inspect" && !extra) {

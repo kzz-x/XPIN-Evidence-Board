@@ -13,9 +13,15 @@
     "ambient": 0.55,
     "grain": 0.002
   },
-  "assetFiles": { "evidence-map": "./evidence.svg" },
+  "assetFiles": {
+    "evidence-map": "./evidence.svg"
+  },
   "camera": {
-    "target": [0, 0, 0.1],
+    "target": [
+      0,
+      0,
+      0.1
+    ],
     "distance": 19,
     "yaw": 0.1,
     "pitch": -0.15,
@@ -28,7 +34,11 @@
       "kind": "photo",
       "title": "目击地点",
       "body": "示例地图 / 可替换为本地照片",
-      "position": [-2, 0.5, 0.04],
+      "position": [
+        -2,
+        0.5,
+        0.04
+      ],
       "rotationDeg": -5,
       "assetId": "evidence-map"
     },
@@ -37,7 +47,11 @@
       "kind": "file",
       "title": "现场记录",
       "body": "23:40 最后目击\n00:12 车辆经过\n01:26 收到照片\n\n这些信息是否来自同一个地点？",
-      "position": [2, 0.4, 0.06],
+      "position": [
+        2,
+        0.4,
+        0.06
+      ],
       "rotationDeg": 4
     },
     {
@@ -45,13 +59,21 @@
       "kind": "note",
       "title": "待核实",
       "body": "先看地点，再看时间。",
-      "position": [0, -2.3, 0.08],
+      "position": [
+        0,
+        -2.3,
+        0.14
+      ],
       "rotationDeg": -3
     },
     {
       "id": "clip-d",
       "kind": "clip",
-      "position": [-2, 1.95, 0.065],
+      "position": [
+        -2,
+        1.95,
+        0.065
+      ],
       "width": 0.65,
       "height": 0.75
     }
@@ -60,13 +82,21 @@
     {
       "id": "pin-a",
       "hostId": "photo-a",
-      "local": [0.5, 0.95, 0.035],
+      "local": [
+        0.5,
+        0.95,
+        0.035
+      ],
       "color": "#b5242c"
     },
     {
       "id": "pin-b",
       "hostId": "file-b",
-      "local": [-0.55, 1.25, 0.035],
+      "local": [
+        -0.55,
+        1.25,
+        0.035
+      ],
       "color": "#b5242c"
     }
   ],
@@ -94,8 +124,16 @@
     {
       "id": "window-key",
       "name": "窗外暖光",
-      "position": [-5, 7, 12],
-      "target": [0, 0, 0.1],
+      "position": [
+        -5,
+        7,
+        12
+      ],
+      "target": [
+        0,
+        0,
+        0.1
+      ],
       "intensity": 700,
       "angle": 32,
       "penumbra": 0.35,
@@ -110,7 +148,10 @@
       "id": "shot-arrival",
       "title": "01 / 证据抵达",
       "duration": 4,
-      "targetIds": ["photo-a", "file-b"],
+      "targetIds": [
+        "photo-a",
+        "file-b"
+      ],
       "motion": "push",
       "actions": [
         {
@@ -149,7 +190,7 @@
           "id": "a-clip",
           "targetId": "clip-d",
           "type": "clamp",
-          "start": 1.8,
+          "start": 2.15,
           "duration": 0.8,
           "strength": 0.6,
           "origin": "local"
@@ -181,13 +222,16 @@
           "strength": 1,
           "ease": "smooth"
         }
-      ]
+      ],
+      "ease": "smoother"
     },
     {
       "id": "shot-detail",
       "title": "02 / 圈出关键记录",
       "duration": 4,
-      "targetIds": ["file-b"],
+      "targetIds": [
+        "file-b"
+      ],
       "motion": "focus",
       "actions": [
         {
@@ -208,15 +252,44 @@
           "start": 0.2,
           "duration": 2.5,
           "targetId": "file-b",
-          "from": [-2, 0.5, 0.1],
-          "to": [2, 0.4, 0.1],
+          "from": [
+            -2,
+            0.5,
+            0.1
+          ],
+          "to": [
+            2,
+            0.4,
+            0.1
+          ],
           "fromIntensity": 650,
           "toIntensity": 800,
           "fromAngle": 32,
           "toAngle": 26,
           "ease": "smooth"
         }
-      ]
+      ],
+      "ease": "glide",
+      "focusPull": {
+        "from": 13.4,
+        "to": 14,
+        "start": 1.6,
+        "duration": 1.6,
+        "ease": "smooth"
+      },
+      "camera": {
+        "target": [
+          2,
+          0.4,
+          0.1
+        ],
+        "distance": 14,
+        "yaw": -0.22,
+        "pitch": -0.12,
+        "roll": 0,
+        "focal": 52,
+        "fStop": 2.8
+      }
     },
     {
       "id": "shot-overview",
@@ -237,7 +310,8 @@
           "direction": "bottom",
           "fade": 0.9
         }
-      ]
+      ],
+      "ease": "smoother"
     }
   ]
 }

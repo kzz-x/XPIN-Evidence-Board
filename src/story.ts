@@ -1,3 +1,4 @@
+import { cameraProgress, lensState, mixFocus } from "./camera-motion";
 import {
   clone,
   clamp,
@@ -14,7 +15,14 @@ import {
   type Action,
   ratio,
 } from "./model";
-import { actionSample, actionOrigin, screenOffset, spatial } from "./motion";
+import {
+  actionSample,
+  actionOrigin,
+  screenOffset,
+  spatial,
+  cubicEase,
+  actionCurve,
+} from "./motion";
 export interface Frame {
   time: number;
   shotIndex: number;
@@ -27,6 +35,8 @@ export interface Frame {
   lights: Light[];
   deformation: Map<string, { type: Action["type"]; strength: number }>;
 }
+const mixAngle = (a: number, b: number, t: number) =>
+  a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * t;
 export const duration = (p: Project) =>
   p.shots.reduce((n, s) => n + s.duration, 0);
 export function ropePoint(
@@ -81,10 +91,10 @@ export function evaluate(p: Project, time: number): Frame {
     if (local < 0) break;
     frame.shotIndex = i;
     const u = clamp(local / s.duration, 0, 1),
-      k = s.ease === "linear" ? u : smooth(clamp(u / 0.7, 0, 1));
+      k = cameraProgress(s, u);
     const to = clone(s.camera);
-    if (s.motion === "push") to.distance *= 1 - 0.12 * u;
-    if (s.motion === "pan") to.target[0] += 0.65 * (u - 0.5);
+    if (s.motion === "push") to.distance *= 1 - 0.12 * k;
+    if (s.motion === "pan") to.target[0] += 0.65 * (k - 0.5);
     if (s.motion === "rope" && s.ropeId) {
       const r = p.ropes.find((r) => r.id === s.ropeId);
       if (r) {
@@ -96,19 +106,30 @@ export function evaluate(p: Project, time: number): Frame {
             pinWorld(p, b, frame.transforms),
             r.slack,
             r.bend,
-            smooth(u),
+            k,
             r.control,
           );
       }
     }
+    if (s.focusPull) to.focusDistance = s.focusPull.to;
+    const fromLens = lensState(previous, p.settings.focusOffset),
+      toLens = lensState(to, p.settings.focusOffset);
     frame.camera = {
       target: mix3(previous.target, to.target, k),
       distance: mix(previous.distance, to.distance, k),
-      yaw: mix(previous.yaw, to.yaw, k),
+      yaw: mixAngle(previous.yaw, to.yaw, k),
       pitch: mix(previous.pitch, to.pitch, k),
-      roll: mix(previous.roll, to.roll, k),
-      focal: mix(previous.focal, to.focal, k),
+      roll: mixAngle(previous.roll, to.roll, k),
+      focal: Math.exp(mix(Math.log(previous.focal), Math.log(to.focal), k)),
+      fStop: Math.exp(mix(Math.log(fromLens.fStop), Math.log(toLens.fStop), k)),
+      focusDistance: mixFocus(fromLens.focusDistance, toLens.focusDistance, k),
     };
+    if (s.focusPull) {
+      const f = s.focusPull,
+        raw = clamp((local - f.start) / f.duration, 0, 1),
+        q = cubicEase(raw, actionCurve({ ease: f.ease ?? "smooth" } as Action));
+      frame.camera.focusDistance = mixFocus(f.from, f.to, q);
+    }
     previous = clone(to);
     acc += s.duration;
   }

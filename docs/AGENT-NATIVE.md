@@ -2,7 +2,7 @@
 
 目标：Agent 直接用 TypeScript 数据模型、场景编译器和时间线引擎制作可编辑作品。**本指南不要求浏览器会话、页面点击、DOM 选择器或 `window.__XPIN`。** 人类只需打开最终工程，播放检查并决定输出。
 
-适用 Studio V4.1 / Project version 3；这是仓库内源码 API，不是已发布到 npm 的 SDK 包。字段详见 [协议速查](SCENE-REFERENCE.md)，人类操作见 [USER-GUIDE](USER-GUIDE.md)。
+适用 Studio V5 / Project version 3；这是仓库内源码 API，不是已发布到 npm 的 SDK 包。字段详见 [协议速查](SCENE-REFERENCE.md)，人类操作见 [USER-GUIDE](USER-GUIDE.md)。
 
 ## 1. 先拿到正确的源
 
@@ -20,6 +20,7 @@
 npm run project -- compose examples/quickstart/scene.json test-results/quickstart/project.json
 npm run project -- validate test-results/quickstart/project.json
 npm run project -- inspect test-results/quickstart/project.json test-results/quickstart/inspect.json
+npm run project -- audit test-results/quickstart/project.json test-results/quickstart/audit.json
 npm run project -- sample test-results/quickstart/project.json 1.1 test-results/quickstart/frame.json
 npm run project -- compose examples/quickstart/patch.json test-results/quickstart/revised.json test-results/quickstart/project.json
 ```
@@ -31,6 +32,7 @@ npm run project -- compose examples/quickstart/patch.json test-results/quickstar
 | `compose` | 描述、输出路径、可选源工程 | 新的 version 3 可编辑工程；读取本地图片并内嵌 |
 | `validate` | 完整工程 | 结构、参数与引用验证；成功退出码 0，失败非 0 |
 | `inspect` | 完整工程、可选报告路径 | `xpin-inspect/1`；ID、引用、镜头全局时段、时序警告，不打印内嵌素材正文 |
+| `audit` | 完整工程、可选报告路径 | `xpin-production-audit/1`；采样纸面、端点和摄影机；error 退出码 2，warning 为 0 |
 | `sample` | 完整工程、全局秒数、可选帧路径 | `xpin-frame/1`；相机、物件变换、淡化、钉位置、绳端、灯光等可序列化状态 |
 
 `inspect` 的 `warnings` 不导致失败：跨镜头延长可能是有意的，但重叠动作、超出故事的动作必须审查。成功验证只证明数据，不证明构图、无遮挡、电影质感或声音语义同步。
@@ -49,7 +51,7 @@ npm run project -- compose examples/quickstart/patch.json test-results/quickstar
 npm run native:example -- test-results/native-quickstart
 ```
 
-得到 `source.project.json`、`revised.project.json`、`inspect.json`、`frame-1.1.json`。示例直接调用编译器和 `evaluate`，并断言源工程未被修改。
+得到 `source.project.json`、`revised.project.json`、`inspect.json`、`production-audit.json`、`frame-1.1.json`。示例直接调用编译器和 `evaluate`，并断言源工程未被修改。
 
 自己写代码时，可将以下脚本保存到仓库 `examples/my-scene.ts`，通过 `npx tsx examples/my-scene.ts` 运行：
 
@@ -89,6 +91,8 @@ console.log(sampleProject(p, 1.1));
 | `duplicateSelection / removeIds` | 修改工程并维护相关引用；副本使用新 ID，删除可能级联 |
 | `evaluate(p, seconds)` | 纯时间求值，返回 Map，不应向原工程写回中间姿态 |
 | `inspectProject / sampleProject` | 克隆后验证，返回普通 JSON 对象；`renderValidated:false` |
+| `auditProduction(p, step?)` | 非破坏检查；默认 0.25 秒采样，长故事最多约 480 等间隔样本并加动作边界；明确连续碰撞未证明 |
+| `surfaceAt / liftToSurface / ropeHeights` | 查询稳定纸面高度、明确抬高单件、计算实体绳安全高度；不代表完整形体碰撞 |
 | `validateProject` | 验证并补缺省值，会规范化传入对象；保护原对象时先 clone |
 
 `evaluate` 的 Map 不能直接 `JSON.stringify`，否则会变成 `{}`。用 `sampleProject`，或显式 `Object.fromEntries(frame.transforms)`。采样时间是全局秒数，超出故事范围会按引擎规则钳制；NaN / Infinity 不允许。
@@ -96,6 +100,8 @@ console.log(sampleProject(p, 1.1));
 需要嵌入声音时，可在 Node 中读取音轨，写入 `p.audio = "data:audio/wav;base64," + bytes.toString("base64")`，再验证保存；MIME 应匹配实际格式。`SceneBrief` 当前没有 `audioFile` 字段，不能虚构这个参数。
 
 ## 4. 从用户描述变成可编辑工程
+
+必须配合 [制作规范：防穿模、时序与摄影机](PRODUCTION.md)。先设计叙事节拍和空间层级，再生成轨道。分镜表必须考虑不同角度、不同景别和焦点交接；有意保持一致时说明叙事原因，不能默认全程正面同景别。只有源文件和描述也能完成数据制作；不得用页面点击作为制作接口。不要承诺数据报告通过就已达到电影写实。
 
 1. **列实体与保留项。** 建立稳定 ID 表，区分纸张、宿主钉、绳、笔迹、灯、镜头；标记不能动的源数据。
 2. **先做静态布局。** 用 XY 板面、Z 高度和真实尺寸摆好，选字体、画幅、材料。必要时用 `fitBoard` 调板框；它不会移动物件，也不是相机重构图。
@@ -136,6 +142,7 @@ npm run project -- compose examples/quickstart/patch.json revised.project.json s
 npm run typecheck:native
 npm test
 npm run project -- inspect revised.project.json inspect.json
+npm run project -- audit revised.project.json production-audit.json
 npm run project -- sample revised.project.json 0 frame-start.json
 npm run project -- sample revised.project.json 4.5 frame-middle.json
 ```

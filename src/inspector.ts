@@ -1,3 +1,4 @@
+import { cameraTimingControls, lensControls } from "./camera-editor";
 import { looks, brushes, gobos, animationOptions } from "./cinema";
 import {
   eases,
@@ -6,7 +7,7 @@ import {
   actionOrigin,
   spatial,
 } from "./motion";
-import type { Action } from "./model";
+import { animationEditor } from "./animation-editor";
 import type { Studio } from "./studio";
 import { moduleByKind } from "./modules";
 import {
@@ -46,17 +47,20 @@ export function inspector(app: Studio) {
               ? button("替换本地影像", "image", "photo", "wide-button")
               : "") +
             color("纸张 / 材质颜色", "item.color", o.color) +
-            select("字体覆盖", "item.font", o.font ?? "", [
-              ["", "跟随全局字体"],
-              ...app.fonts.map((f) => [f, f] as [string, string]),
-            ]) +
-            range(
-              "文字大小",
-              "item.fontScale",
-              o.fontScale ?? p.settings.fontScale,
-              0.4,
-              2.5,
-              0.05,
+            section(
+              "文字样式覆盖",
+              select("字体覆盖", "item.font", o.font ?? "", [
+                ["", "跟随全局字体"],
+                ...app.fonts.map((f) => [f, f] as [string, string]),
+              ]) +
+                range(
+                  "文字大小",
+                  "item.fontScale",
+                  o.fontScale ?? p.settings.fontScale,
+                  0.4,
+                  2.5,
+                  0.05,
+                ),
             ),
         );
       if (hardware)
@@ -85,7 +89,7 @@ export function inspector(app: Studio) {
           check("隐藏物件", "item.hidden", o.hidden),
       );
       html += section(
-        "材质与部件动画",
+        "材质细节",
         range(
           "表面粗糙度",
           "item.roughness",
@@ -121,17 +125,13 @@ export function inspector(app: Studio) {
                 0.05,
               )
             : " ") +
-          select(
-            "专属入场动画",
-            "item.entrance",
-            o.entrance ?? animationOptions(p, o.id)[0][0],
-            animationOptions(p, o.id),
-          ) +
-          button("应用到故事镜头", "entrance", "play", "wide-button"),
+          "",
+        false,
       );
+      html += animationEditor(app, id);
       html += section(
         "关系与组合",
-        `<div class="button-grid">${button("钉图钉", "pin", "pin")}${button("复制", "duplicate", "group")}${button(o.groupId ? "拆组" : "组合", "group", "group")}${button("存为预设", "preset", "save")}${button("上移一层", "raise")}${button("下移一层", "lower")}${button("水平对齐", "align-x")}${button("垂直对齐", "align-y")}</div>`,
+        `<div class="button-grid">${button("钉图钉", "pin", "pin")}${button("复制", "duplicate", "group")}${button(o.groupId ? "拆组" : "组合", "group", "group")}${button("存为预设", "preset", "save")}${button("上移一层", "raise")}${button("下移一层", "lower")}${button("抬到表面", "lift-surface")}${button("水平对齐", "align-x")}${button("垂直对齐", "align-y")}</div>`,
         false,
       );
       html += `<div class="inspector-actions">${button("加入故事镜头", "shot", "camera", "primary wide-button")}${button("删除选中", "delete", "trash", "danger wide-button")}</div>`;
@@ -261,6 +261,7 @@ export function inspector(app: Studio) {
             ...p.items.map((o) => [o.id, o.title] as [string, string]),
           ]) +
           `<div class="field-row">${number("灯位 X", "light.position.0", l.position[0])}${number("灯位 Y", "light.position.1", l.position[1])}${number("灯位 Z", "light.position.2", l.position[2])}</div><div class="field-row">${number("落点 X", "light.target.0", l.target[0])}${number("落点 Y", "light.target.1", l.target[1])}</div><div class="button-grid">${button("指定落点", "target", "focus")}${button("加入追光 Cue", "cue", "camera")}${button("恢复默认", "light-reset")}${button("复制灯光", "light-copy")}${button("删除灯光", "delete", "trash")}</div>`,
+        true,
       );
   }
   if (app.panel === "scene") {
@@ -392,10 +393,7 @@ export function inspector(app: Studio) {
             ["rope", "沿绳追踪"],
             ["overview", "全局揭示"],
           ]) +
-          select("缓动", "shot.ease", shot.ease, [
-            ["smooth", "平滑衔接"],
-            ["linear", "匀速"],
-          ]) +
+          cameraTimingControls(shot) +
           `<div class="button-grid">${button("用当前机位", "capture-camera", "camera")}${button("重新自动构图", "reframe", "focus")}${button("向前移", "shot-left")}${button("向后移", "shot-right")}${button("复制镜头", "shot-copy")}${button("删除镜头", "shot-delete", "trash")}</div>`,
       );
     const c = shot.camera;
@@ -433,27 +431,15 @@ export function inspector(app: Studio) {
         range("焦距", "shot.camera.focal", c.focal, 24, 100, 1, " mm"),
       false,
     );
+    html += lensControls(shot, p);
+    html += animationEditor(app);
     html += section(
-      "入场 / 退场与逐笔轨道",
-      `<div class="helper">选物件后加入轨道。默认淡化，画外位置按当前镜头与输出画幅计算；局部动作仍可选择近处或原位。</div><div class="button-grid">${button("加入选中物入场", "action", "plus")}${button("加入选中物退场", "action-out", "plus")}${button("加入选中追光", "cue", "light")}</div>` +
-        shot.actions
-          .map(
-            (a) =>
-              `<div class="track-row"><b>${esc(app.name(a.targetId))}</b>${select(
-                "动作方式",
-                `action.${a.id}.type`,
-                a.type,
-                animationOptions(p, a.targetId, a.type),
-              )}${motionControls(a)}<div class="field-row">${number("开始", `action.${a.id}.start`, a.start)}${number("时长", `action.${a.id}.duration`, a.duration)}${number("强度", `action.${a.id}.strength`, a.strength)}</div><button data-remove-action="${a.id}">移除轨道</button></div>`,
-          )
-          .join(""),
-    );
-    html += section(
-      "追光 Cue",
-      shot.cues
+      "全部追光 Cue",
+      p.shots
+        .flatMap((s) => s.cues.map((c) => ({ s, c })))
         .map(
-          (c) =>
-            `<div class="track-row"><b>${esc(p.lights.find((l) => l.id === c.lightId)?.name ?? "灯光")}</b>${select("结束目标", `cue.${c.id}.targetId`, c.targetId ?? "", [["", "自由落点"], ...p.items.map((o) => [o.id, o.title] as [string, string])])}<div class="field-row">${number("开始", `cue.${c.id}.start`, c.start)}${number("时长", `cue.${c.id}.duration`, c.duration)}</div><div class="field-row">${number("进入亮度", `cue.${c.id}.fromIntensity`, c.fromIntensity, 1)}${number("结束亮度", `cue.${c.id}.toIntensity`, c.toIntensity, 1)}</div><div class="field-row">${number("起始 X", `cue.${c.id}.from.0`, c.from[0])}${number("起始 Y", `cue.${c.id}.from.1`, c.from[1])}</div><div class="field-row">${number("结束 X", `cue.${c.id}.to.0`, c.to[0])}${number("结束 Y", `cue.${c.id}.to.1`, c.to[1])}</div><div class="field-row">${number("进入半角", `cue.${c.id}.fromAngle`, c.fromAngle, 1)}${number("结束半角", `cue.${c.id}.toAngle`, c.toAngle, 1)}</div>${select(
+          ({ s, c }) =>
+            `<details class="track-row" data-detail-key="cue/${c.id}"><summary>${esc(s.title)} · ${esc(p.lights.find((l) => l.id === c.lightId)?.name ?? "灯光")}</summary><div class="track-body">${select("结束目标", `cue.${c.id}.targetId`, c.targetId ?? "", [["", "自由落点"], ...p.items.map((o) => [o.id, o.title] as [string, string])])}<div class="field-row">${number("开始", `cue.${c.id}.start`, c.start)}${number("时长", `cue.${c.id}.duration`, c.duration)}</div><div class="field-row">${number("进入亮度", `cue.${c.id}.fromIntensity`, c.fromIntensity, 1)}${number("结束亮度", `cue.${c.id}.toIntensity`, c.toIntensity, 1)}</div><div class="field-row">${number("起始 X", `cue.${c.id}.from.0`, c.from[0])}${number("起始 Y", `cue.${c.id}.from.1`, c.from[1])}</div><div class="field-row">${number("结束 X", `cue.${c.id}.to.0`, c.to[0])}${number("结束 Y", `cue.${c.id}.to.1`, c.to[1])}</div><div class="field-row">${number("进入半角", `cue.${c.id}.fromAngle`, c.fromAngle, 1)}${number("结束半角", `cue.${c.id}.toAngle`, c.toAngle, 1)}</div>${select(
               "过渡方式",
               `cue.${c.id}.ease`,
               c.ease,
@@ -462,12 +448,29 @@ export function inspector(app: Studio) {
                 ["linear", "匀速"],
                 ["hold", "保持后切换"],
               ],
-            )}<button data-remove-cue="${c.id}">移除 Cue</button></div>`,
+            )}<button data-remove-cue="${c.id}">移除 Cue</button></div></details>`,
         )
         .join("") ||
         '<p class="helper">在布光面板选灯光，加入 Cue。镜头运动和追光可以独立编排。</p>',
     );
   }
+  if (app.panel === "scene" || app.panel === "shot")
+    html += section(
+      "制作安全检查",
+      button("检查穿模与运镜", "production-audit", "focus", "wide-button") +
+        '<p class="helper">检查稳定纸面、钉头、连接时序及采样摄影机路径。不是完整碰撞求解；原布局不会被自动改写。</p>' +
+        (app.productionReport
+          ? `<div class="audit-list">${
+              app.productionReport.issues
+                .slice(0, 24)
+                .map(
+                  (i) =>
+                    `<p><b>${esc(i.code)}</b> · ${i.time.toFixed(2)}s<br>${i.ids.map((id) => `<button data-select="${id}">${esc(app.name(id))}</button>`).join(" ")}<br>${esc(i.message)}</p>`,
+                )
+                .join("") || "<p>未发现当前采样范围内的问题，仍需播放检查。</p>"
+            }</div>`
+          : ""),
+    );
   if (app.panel === "object" && app.tool === "mark")
     html =
       section(
@@ -489,48 +492,7 @@ export function inspector(app: Studio) {
           button("波浪线", "mark-wave") +
           "</div>",
       ) + html;
+  if (app.panel === "object" && (o || r || pin || mark))
+    if (!o) html += animationEditor(app, id);
   return html;
-}
-
-function motionControls(a: Action) {
-  const bind = `action.${a.id}`,
-    c = actionCurve(a);
-  return (
-    select("演出阶段", `${bind}.phase`, a.phase ?? "in", [
-      ["in", "入场 · 淡入"],
-      ["out", "退场 · 淡出"],
-    ]) +
-    select(
-      "缓动曲线",
-      `${bind}.ease`,
-      a.ease ?? (a.phase === "out" ? "accelerate" : "cinematic"),
-      eases,
-    ) +
-    curvePreview(a) +
-    (a.ease === "custom"
-      ? `<div class="field-row">${range("起点控制 X", `${bind}.bezier.0`, c[0], 0, 1, 0.01)}${range("起点控制 Y", `${bind}.bezier.1`, c[1], 0, 1, 0.01)}</div><div class="field-row">${range("终点控制 X", `${bind}.bezier.2`, c[2], 0, 1, 0.01)}${range("终点控制 Y", `${bind}.bezier.3`, c[3], 0, 1, 0.01)}</div>`
-      : "") +
-    range("淡化占比", `${bind}.fade`, a.fade ?? 0.65, 0, 1, 0.01) +
-    (spatial(a)
-      ? select("起止位置", `${bind}.origin`, actionOrigin(a), [
-          ["screen", "画面外"],
-          ["local", "物件附近"],
-          ["stationary", "原位动作 / 淡化"],
-        ]) +
-        (actionOrigin(a) === "screen"
-          ? select(
-              "画外方向",
-              `${bind}.direction`,
-              a.direction ?? (a.type === "slide" ? "left" : "top"),
-              [
-                ["left", "左侧"],
-                ["right", "右侧"],
-                ["top", "上方"],
-                ["bottom", "下方"],
-              ],
-            ) +
-            range("画外距离", `${bind}.travel`, a.travel ?? 1, 1, 4, 0.05, "×")
-          : "")
-      : "")
-  );
 }

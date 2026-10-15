@@ -94,6 +94,8 @@ export interface Pose {
   pitch: number;
   roll: number;
   focal: number;
+  fStop?: number;
+  focusDistance?: number;
 }
 export interface Cue {
   id: string;
@@ -144,7 +146,16 @@ export interface Shot {
   manualCamera?: boolean;
   motion: "focus" | "push" | "pan" | "rope" | "overview";
   ropeId?: string;
-  ease: "smooth" | "linear";
+  ease: import("./camera-motion").CameraEase;
+  bezier?: import("./motion").Bezier;
+  moveFraction?: number;
+  focusPull?: {
+    from: number;
+    to: number;
+    start: number;
+    duration: number;
+    ease?: Exclude<import("./motion").Ease, "custom">;
+  };
   actions: Action[];
   cues: Cue[];
 }
@@ -195,6 +206,8 @@ export interface Project {
   assets: Record<string, string>;
   settings: Settings;
   camera: Pose;
+  /** Editor navigation is independent of authored story cameras. */
+  editorView?: Pose;
   presets: Preset[];
   favorites: string[];
   audio?: string;
@@ -370,7 +383,7 @@ export function makeShot(
     targetIds: ids,
     camera: poseFor(project, ids, motion),
     motion,
-    ease: "smooth",
+    ease: "smoother",
     actions: [],
     cues: [],
   };
@@ -583,8 +596,13 @@ export function validateProject(p: unknown): Project {
     vector(p.target) &&
     numbers(p.distance, p.yaw, p.pitch, p.roll, p.focal) &&
     p.distance > 0 &&
-    p.focal > 0;
+    p.focal > 0 &&
+    (p.fStop === undefined ||
+      (Number.isFinite(p.fStop) && p.fStop >= 0.8 && p.fStop <= 22)) &&
+    (p.focusDistance === undefined ||
+      (Number.isFinite(p.focusDistance) && p.focusDistance >= 0.1));
   if (!poseValid(s.camera)) throw new Error("摄影机参数无效");
+  if (s.editorView && !poseValid(s.editorView)) throw new Error("编辑视角无效");
   if (
     !["cork", "felt", "wood", "grid"].includes(s.settings.board) ||
     !["16:9", "9:16", "3:4", "1:1"].includes(s.settings.aspect) ||
@@ -616,6 +634,40 @@ export function validateProject(p: unknown): Project {
       shot.targetIds.some((id) => !entities.has(id))
     )
       throw new Error("镜头目标无效");
+    if (
+      ![
+        "smooth",
+        "smoother",
+        "cinematic",
+        "glide",
+        "linear",
+        "custom",
+      ].includes(shot.ease) ||
+      (shot.moveFraction !== undefined &&
+        (!Number.isFinite(shot.moveFraction) ||
+          shot.moveFraction < 0.1 ||
+          shot.moveFraction > 1)) ||
+      (shot.bezier !== undefined &&
+        (!Array.isArray(shot.bezier) ||
+          shot.bezier.length !== 4 ||
+          !shot.bezier.every((n) => Number.isFinite(n) && n >= 0 && n <= 1)))
+    )
+      throw Error("摄影机曲线无效");
+    if (shot.focusPull) {
+      const f = shot.focusPull;
+      if (
+        !numbers(f.from, f.to, f.start, f.duration) ||
+        f.from < 0.1 ||
+        f.to < 0.1 ||
+        f.start < 0 ||
+        f.duration <= 0 ||
+        (f.ease !== undefined &&
+          !["cinematic", "smooth", "gentle", "accelerate", "linear"].includes(
+            f.ease,
+          ))
+      )
+        throw Error("拉焦参数无效");
+    }
     for (const a of shot.actions)
       if (
         !entities.has(a.targetId) ||

@@ -1,3 +1,5 @@
+import { installShadowFilter, shadowRadius } from "./shadow-filter";
+import { ropeHeights } from "./rope-clearance";
 import * as T from "three";
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
@@ -89,6 +91,7 @@ export class BoardRenderer {
     public container: HTMLElement,
     pose: Pose,
   ) {
+    installShadowFilter();
     this.pose = clone(pose);
     this.renderer = new T.WebGLRenderer({
       antialias: true,
@@ -386,6 +389,7 @@ export class BoardRenderer {
     mode: Mode = this.mode,
     pose?: Pose,
     output = false,
+    editing = mode === "build",
   ) {
     this.renderer.info.reset();
     const f = evaluate(p, time);
@@ -453,6 +457,15 @@ export class BoardRenderer {
       }
       fadeGroup(g, play ? (f.opacity.get(o.id) ?? 1) : 1, this.materials.metal);
     }
+    for (const g of this.selection.children) {
+      const o = p.items.find((o) => o.id === g.userData.id);
+      if (!o) continue;
+      const tr = play ? f.transforms.get(o.id)! : o;
+      g.position.set(...tr.position);
+      g.rotation.z = tr.rotation;
+      g.scale.setScalar(tr.scale);
+      g.visible = play ? Boolean(f.visible.get(o.id)) : !o.hidden;
+    }
     for (const pin of p.pins) {
       const g = this.pins.get(pin.id);
       if (!g) continue;
@@ -491,11 +504,19 @@ export class BoardRenderer {
         }
       a[2] += 0.145;
       b[2] += 0.145;
-      const sig = JSON.stringify([a, b, r]);
+      const heights = ropeHeights(
+        p,
+        r,
+        a,
+        b,
+        play ? f.transforms : undefined,
+        play ? f.visible : undefined,
+      );
+      const sig = JSON.stringify([a, b, r, heights]);
       let g = this.ropes.get(r.id);
       if (!g || this.ropeSigs.get(r.id) !== sig) {
         if (g) disposeTree(g);
-        g = ropeMesh(r, a, b, this.materials);
+        g = ropeMesh(r, a, b, this.materials, heights);
         this.ropes.set(r.id, g);
         this.ropeSigs.set(r.id, sig);
         this.scene.add(g);
@@ -632,7 +653,50 @@ export class BoardRenderer {
       camera.target[1] + Math.sin(az) * 16,
       Math.tan(el) * 13,
     );
-    const shadowExtent = Math.max(12, camera.distance * 0.6);
+    const shadowSize = Math.min(
+      this.renderer.capabilities.maxTextureSize,
+      settings.quality === "ultra"
+        ? 8192
+        : settings.quality === "studio"
+          ? 4096
+          : 1024,
+    );
+    const aspect = output ? ratio(settings.aspect) : this.width / this.height;
+    const footprint =
+      ((camera.distance * 35) / (2 * camera.focal * Math.max(1, aspect))) *
+      Math.hypot(1, aspect);
+    const shadowExtent = Math.max(
+      2.8,
+      Math.min(
+        Math.max(settings.boardWidth, settings.boardHeight) * 0.85,
+        (footprint * 1.25) /
+          Math.max(0.4, Math.cos(camera.yaw) * Math.cos(camera.pitch)) +
+          0.6,
+      ),
+    );
+    const back = this.key.position
+        .clone()
+        .sub(this.key.target.position)
+        .normalize(),
+      right = new T.Vector3(0, 1, 0).cross(back).normalize(),
+      up = back.clone().cross(right),
+      texel = (2 * shadowExtent) / shadowSize;
+    const center = this.key.target.position.clone(),
+      dx = Math.round(center.dot(right) / texel) * texel - center.dot(right),
+      dy = Math.round(center.dot(up) / texel) * texel - center.dot(up);
+    const snap = right.multiplyScalar(dx).add(up.multiplyScalar(dy));
+    this.key.position.add(snap);
+    this.key.target.position.add(snap);
+    const lightDistance = this.key.position.distanceTo(
+      this.key.target.position,
+    );
+    this.key.shadow.camera.near = Math.max(
+      0.1,
+      lightDistance - shadowExtent * 1.5 - 3,
+    );
+    this.key.shadow.camera.far = lightDistance + shadowExtent * 1.5 + 3;
+    this.key.shadow.normalBias = 0.0005;
+    this.key.shadow.bias = -0.000012;
     this.key.shadow.camera.left = -shadowExtent;
     this.key.shadow.camera.right = shadowExtent;
     this.key.shadow.camera.top = shadowExtent;
@@ -640,15 +704,10 @@ export class BoardRenderer {
     this.key.shadow.camera.updateProjectionMatrix();
     this.key.intensity = settings.keyIntensity;
     this.key.color.set(settings.keyColor);
-    this.key.shadow.radius = settings.softness;
+    this.key.shadow.radius = shadowRadius(settings.softness, texel);
     this.ambient.intensity = settings.ambient;
     this.fill.intensity = settings.ambient * 0.8;
-    const size =
-      settings.quality === "ultra"
-        ? 4096
-        : settings.quality === "studio"
-          ? 2048
-          : 1024;
+    const size = shadowSize;
     if (this.key.shadow.mapSize.x !== size) {
       this.key.shadow.mapSize.set(size, size);
       this.key.shadow.map?.dispose();
@@ -690,32 +749,43 @@ export class BoardRenderer {
         settings.quality === "draft"
           ? 1024
           : settings.quality === "ultra"
-            ? 4096
-            : 2048;
+            ? Math.min(8192, this.renderer.capabilities.maxTextureSize)
+            : 4096;
       if (light.shadow.mapSize.x !== spotSize) {
         light.shadow.mapSize.set(spotSize, spotSize);
         light.shadow.map?.dispose();
         light.shadow.map = null;
       }
 
-      light.shadow.radius = settings.softness;
+      light.shadow.radius = shadowRadius(
+        settings.softness,
+        (2 *
+          light.position.distanceTo(light.target.position) *
+          Math.tan(light.angle)) /
+          spotSize,
+      );
+      light.shadow.bias = -0.000012;
+      light.shadow.normalBias = 0.0005;
       light.shadow.camera.far = Math.max(10, l.distance);
     }
     this.cameraPose(
       camera,
       output ? ratio(settings.aspect) : this.width / this.height,
     );
-    this.grid.visible = !output && mode === "build" && settings.grid;
-    this.helpers.visible = !output && mode === "build";
-    this.selection.visible = !output && mode === "build";
+    this.grid.visible = !output && editing && settings.grid;
+    this.helpers.visible = !output && editing;
+    this.selection.visible = !output && editing;
     this.renderer.toneMappingExposure = settings.exposure;
     this.bokeh.enabled = settings.dof > 0 && settings.quality !== "draft";
     const focus = new T.Vector3(...camera.target)
         .sub(this.camera.position)
         .dot(this.camera.getWorldDirection(new T.Vector3())),
       uniforms = this.bokeh.uniforms as Record<string, T.IUniform>;
-    uniforms.focus.value = Math.max(0.1, focus + settings.focusOffset);
-    uniforms.aperture.value = settings.dof * 0.014;
+    uniforms.focus.value = Math.max(
+      0.1,
+      camera.focusDistance ?? focus + settings.focusOffset,
+    );
+    uniforms.aperture.value = (settings.dof * 0.056) / (camera.fStop ?? 4);
     uniforms.maxblur.value = 0.022;
     uniforms.aspect.value = this.camera.aspect;
     this.look.uniforms.seed.value = Math.floor(time * 24) * 0.01;
@@ -798,6 +868,10 @@ export class BoardRenderer {
       textures: this.renderer.info.memory.textures,
       geometries: this.renderer.info.memory.geometries,
       dof: this.bokeh.enabled,
+      shadowMap: this.key.shadow.mapSize.x,
+      shadowExtent: this.key.shadow.camera.right,
+      shadowTexelWorld:
+        (2 * this.key.shadow.camera.right) / this.key.shadow.mapSize.x,
       contextLost: gl.isContextLost(),
     };
   }
@@ -808,6 +882,7 @@ export class BoardRenderer {
     width = 1920,
     supersample = 1,
     quality?: Project["settings"]["quality"],
+    pose?: Pose,
   ) {
     const aspect = ratio(p.settings.aspect),
       height = Math.round(width / aspect),
@@ -828,7 +903,7 @@ export class BoardRenderer {
       this.renderer.setSize(width * supersample, height * supersample, false);
       this.composer.setPixelRatio(1);
       this.composer.setSize(width * supersample, height * supersample);
-      this.renderAt(p, time, mode, undefined, true);
+      this.renderAt(p, time, mode, pose, true);
       const canvas = document.createElement("canvas");
       canvas.width = width;
       canvas.height = height;
@@ -848,7 +923,7 @@ export class BoardRenderer {
       this.composer.setPixelRatio(pixel);
       this.renderer.setSize(w, h);
       this.composer.setSize(w, h);
-      this.renderAt(p, time, mode);
+      this.renderAt(p, time, mode, pose);
     }
   }
 }

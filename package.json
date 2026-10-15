@@ -1,7 +1,7 @@
 {
   "name": "xpin-evidence-board",
   "private": true,
-  "version": "0.4.1",
+  "version": "0.5.0",
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
@@ -17,7 +17,8 @@
     "test:motion": "node scripts/motion-regression.mjs",
     "project": "tsx scripts/project.ts",
     "native:example": "tsx examples/native-authoring.ts",
-    "typecheck:native": "tsc --project tsconfig.native.json"
+    "typecheck:native": "tsc --project tsconfig.native.json",
+    "test:v5": "node scripts/v5-regression.mjs"
   },
   "dependencies": {
     "mediabunny": "1.61.4",
