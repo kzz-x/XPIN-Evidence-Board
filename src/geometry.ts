@@ -1,22 +1,18 @@
+import { paperPoint, paperThickness } from "./paper-profile";
 import { moduleByKind } from "./catalog";
 import * as T from "three";
 import { ropePoint } from "./story";
 import type { Item, Rope, V3 } from "./model";
 import type { Materials } from "./materials";
-export function physical<
-  G extends T.BufferGeometry,
-  M extends T.Material | T.Material[],
->(geometry: G, material: M) {
-  const mesh = new T.Mesh(geometry, material);
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
-  return mesh;
-}
+export { physical } from "./mesh";
+import { physical } from "./mesh";
+import { binderClip, paperClip } from "./hardware";
+import { folderMesh } from "./folder";
 export { paperSurface } from "./surface";
 import { paperSurface } from "./surface";
 /** One closed sheet; back and edge share the front curvature. */
-export function paperGeometry(o: Item) {
-  const n = 32,
+export function paperGeometry(o: Item, thickness = paperThickness(o)) {
+  const n = 64,
     top = new T.PlaneGeometry(o.width, o.height, n, n);
   const pos = top.attributes.position,
     uv = top.attributes.uv;
@@ -27,15 +23,8 @@ export function paperGeometry(o: Item) {
     for (let i = 0; i < pos.count; i++) {
       let x = pos.getX(i),
         y = pos.getY(i);
-      if (
-        (o.kind === "news" || o.kind === "label") &&
-        (Math.abs(x) >= o.width / 2 - 0.001 ||
-          Math.abs(y) >= o.height / 2 - 0.001)
-      ) {
-        x += Math.sin(i * 3.8) * 0.009;
-        y += Math.sin(i * 6.2) * 0.007;
-      }
-      vertices.push(x, y, paperSurface(o, x, y) - side * 0.006);
+      [x, y] = paperPoint(o, x, y);
+      vertices.push(x, y, paperSurface(o, x, y) - side * thickness);
       uvs.push(uv.getX(i), uv.getY(i));
     }
   const front = Array.from(top.index!.array);
@@ -107,88 +96,15 @@ export function createItem(o: Item, mat: Materials) {
   if (o.kind === "pin") {
     g.add(pinMesh(o.color, mat, o.roughness));
   } else if (o.kind === "clip") {
-    const spring = new T.Shape();
-    spring.moveTo(-0.025, -0.14);
-    spring.lineTo(-0.23, -0.14);
-    spring.lineTo(-0.055, 0.11);
-    spring.lineTo(-0.025, 0.11);
-    spring.closePath();
-    const body = physical(
-      new T.ExtrudeGeometry(spring, {
-        depth: 0.58,
-        bevelEnabled: true,
-        bevelSegments: 3,
-        steps: 1,
-        bevelSize: 0.012,
-        bevelThickness: 0.008,
-      }),
-      new T.MeshPhysicalMaterial({
-        color: o.color,
-        roughnessMap: mat.metalFinish,
-        bumpMap: mat.metalFinish,
-        bumpScale: 0.0001,
-        clearcoat: 0.25,
-        clearcoatRoughness: 0.3,
-        metalness: 0.74,
-        roughness: o.roughness ?? 0.35,
-      }),
-    );
-    body.rotation.y = Math.PI / 2;
-    body.position.x = -0.29;
-    g.add(body);
-    const jawMaterial = new T.MeshPhysicalMaterial({
-      roughnessMap: mat.metalFinish,
-      clearcoat: 0.25,
-      clearcoatRoughness: 0.3,
-      color: o.color,
-      metalness: 0.7,
-      roughness: o.roughness ?? 0.3,
-    });
-    const lower = physical(new T.BoxGeometry(0.58, 0.14, 0.015), jawMaterial);
-    lower.position.set(0, 0.1, 0.016);
-    g.add(lower);
-    const jaw = new T.Group();
-    jaw.userData.clipJaw = true;
-    jaw.position.set(0, -0.02, 0.028);
-    const upper = physical(new T.BoxGeometry(0.58, 0.2, 0.015), jawMaterial);
-    upper.position.y = 0.12;
-    jaw.add(upper);
-    g.add(jaw);
-    for (const side of [-1, 1]) {
-      const curve = new T.CatmullRomCurve3([
-        new T.Vector3(-0.18, 0.07, side * 0.04 + 0.13),
-        new T.Vector3(-0.2, 0.42, side * 0.04 + 0.14),
-        new T.Vector3(0, 0.52, side * 0.04 + 0.14),
-        new T.Vector3(0.2, 0.42, side * 0.04 + 0.14),
-        new T.Vector3(0.18, 0.07, side * 0.04 + 0.13),
-      ]);
-      const handle = physical(
-        new T.TubeGeometry(curve, 48, 0.02, 12, false),
-        metal(),
-      );
-      handle.userData.clipHandle = true;
-      g.add(handle);
-    }
+    g.add(binderClip(o, mat));
   } else if (o.kind === "staple") {
-    const points = [
-      [-0.08, 0.34, 0],
-      [-0.1, -0.26, 0],
-      [0.08, -0.33, 0],
-      [0.1, 0.32, 0],
-      [-0.02, 0.37, 0],
-      [-0.04, -0.16, 0],
-      [0.045, -0.21, 0],
-      [0.05, 0.23, 0],
-    ].map((p) => new T.Vector3(p[0], p[1], 0.035));
-    g.add(
-      physical(
-        new T.TubeGeometry(new T.CatmullRomCurve3(points), 90, 0.014, 8, false),
-        metal(),
-      ),
-    );
+    g.add(paperClip(o, mat));
+  } else if (o.kind === "folder") {
+    g.add(folderMesh(o, mat, paperGeometry));
   } else if (o.kind === "tape") {
     const m = new T.MeshPhysicalMaterial({
-      color: o.color,
+      color: "#ffffff",
+      map: mat.tapeContent(o),
       roughness: o.roughness ?? 0.7,
       transparent: true,
       opacity: 0.72,
@@ -202,9 +118,11 @@ export function createItem(o: Item, mat: Materials) {
     g.add(mesh);
   } else {
     const m = mat.paperMaterial(o);
-    if (o.kind === "stamp")
-      g.add(physical(new T.PlaneGeometry(o.width, o.height), m));
-    else {
+    if (o.kind === "stamp") {
+      const stamp = physical(new T.PlaneGeometry(o.width, o.height), m);
+      stamp.castShadow = false;
+      g.add(stamp);
+    } else {
       const back = new T.MeshStandardMaterial({
         color: o.color,
         roughness: 0.97,
@@ -252,6 +170,7 @@ export function pinMesh(color: string, mat: Materials, roughness = 0.26) {
   const head = physical(new T.LatheGeometry(rounded, 64), plastic);
   head.rotation.x = Math.PI / 2;
   head.position.z = 0.035;
+  head.userData.pinPlastic = true;
   g.add(head);
   const shaft = physical(
     new T.CylinderGeometry(0.013, 0.009, 0.19, 24),

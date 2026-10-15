@@ -88,6 +88,48 @@ export function inspector(app: Studio) {
           check("锁定物件", "item.locked", o.locked) +
           check("隐藏物件", "item.hidden", o.hidden),
       );
+      if (paper)
+        html += section(
+          "纸张与磨损",
+          select("磨损预设", "item.wearPreset", "custom", [
+            ["custom", "自定义 / 当前参数"],
+            ["clean", "崭新干净"],
+            ["archive", "轻度存档"],
+            ["aged", "陈旧档案"],
+            ["torn", "破旧撕边"],
+          ]) +
+            range("磨损程度", "item.wear", o.wear ?? 0.35, 0, 1, 0.01) +
+            range("撕纸边缘", "item.edgeTear", o.edgeTear ?? 0.65, 0, 1, 0.01) +
+            range(
+              "轻微污渍",
+              "item.stainAmount",
+              o.stainAmount ?? 0.18,
+              0,
+              1,
+              0.01,
+            ) +
+            button("换一组随机细节", "paper-random", "refresh", "wide-button") +
+            (o.kind === "folder"
+              ? range(
+                  "文件夹厚度",
+                  "item.folderDepth",
+                  o.folderDepth ?? 0.085,
+                  0.03,
+                  0.4,
+                  0.005,
+                ) +
+                range(
+                  "封面张开角度",
+                  "item.folderOpen",
+                  o.folderOpen ?? 4,
+                  0,
+                  35,
+                  0.5,
+                  "°",
+                )
+              : "") +
+            '<p class="helper">撕边和卷曲使用真实几何。随机细节随工程保存，回拖不会闪变。磨损设为 0 可去除旧化；纸张翘曲可在材质细节独立调整。</p>',
+        );
       html += section(
         "材质细节",
         range(

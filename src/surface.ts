@@ -5,18 +5,8 @@ import {
   type Transform,
   type V3,
 } from "./model";
-export function paperSurface(o: Item, x: number, y: number) {
-  const u = Math.max(-0.5, Math.min(0.5, x / o.width)),
-    v = Math.max(-0.5, Math.min(0.5, y / o.height));
-  return (
-    0.007 +
-    ((Math.pow(Math.abs(u) * 2, 8) * 0.018 +
-      Math.pow(Math.abs(v) * 2, 10) * 0.01) *
-      (o.kind === "note" ? 1.5 : 1) +
-      Math.sin(u * 2.3 + v * 1.2) * 0.002) *
-      (o.paperCurl ?? 1)
-  );
-}
+export { paperSurface } from "./paper-profile";
+import { paperSurface, paperUnderside } from "./paper-profile";
 export const isPaper = (o: Item) =>
   !["clip", "pin", "staple", "stamp"].includes(o.kind);
 export function surfaceAt(
@@ -54,9 +44,12 @@ export function surfaceAt(
 export function liftToSurface(p: Project, id: string, clearance = 0.015) {
   const o = p.items.find((o) => o.id === id);
   if (!o) return false;
+  if (!Number.isFinite(clearance) || clearance < 0 || clearance > 1)
+    throw Error("表面间距无效");
   let z = 0;
-  for (const u of [-0.48, 0, 0.48])
-    for (const v of [-0.48, 0, 0.48]) {
+  const points = Array.from({ length: 9 }, (_, i) => -0.495 + (i * 0.99) / 8);
+  for (const u of points)
+    for (const v of points) {
       const x = u * o.width * o.scale,
         y = v * o.height * o.scale,
         c = Math.cos(o.rotation),
@@ -69,10 +62,21 @@ export function liftToSurface(p: Project, id: string, clearance = 0.015) {
           o.position[1] + x * s + y * c,
           undefined,
           id,
-        ),
+        ) +
+          clearance -
+          (isPaper(o)
+            ? paperUnderside(o, u * o.width, v * o.height)
+            : o.kind === "clip"
+              ? 0.013
+              : o.kind === "staple"
+                ? 0.0155
+                : o.kind === "pin"
+                  ? 0.035
+                  : 0) *
+            o.scale,
       );
     }
-  const next = Math.max(o.position[2], z + clearance + 0.006 * o.scale);
+  const next = Math.max(o.position[2], z);
   const moved = next > o.position[2];
   o.position[2] = next;
   return moved;

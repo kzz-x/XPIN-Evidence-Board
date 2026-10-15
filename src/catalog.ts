@@ -73,7 +73,7 @@ export const modules: Module[] = [
   },
   {
     kind: "folder",
-    name: "牛皮纸袋",
+    name: "档案文件夹",
     category: "文件资料",
     width: 4.1,
     height: 3.1,

@@ -246,3 +246,12 @@ export {
   mixFocus,
   lensState,
 } from "./camera-motion";
+
+export {
+  paperSurface,
+  paperPoint,
+  paperThickness,
+  paperSeed,
+  wearParameters,
+  folderSettings,
+} from "./paper-profile";

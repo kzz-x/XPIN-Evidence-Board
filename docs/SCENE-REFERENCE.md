@@ -132,3 +132,27 @@ V4.1 可选：`phase: in|out`、`ease: cinematic|smooth|gentle|accelerate|linear
    "roll":0,"focal":52,"fStop":2.8},
  "focusPull":{"from":13.4,"to":14,"start":2.8,"duration":1.6,"ease":"smooth"}}
 ```
+
+## V5.1 磨损与实体文件夹
+
+| Item 可选字段 | 范围／缺省 | 用途 |
+|---|---|---|
+| `wear` | 0–1，0.35 | 总旧化强度；0 去除撕边／随机旧化／污渍 |
+| `edgeTear` | 0–1，0.65 | 真实几何撕边强度，与 wear 相乘 |
+| `stainAmount` | 0–1，0.18 | 轻微污渍颜料，不是投影 |
+| `wearSeed` | 0–2147483647 整数，省略按 ID 派生 | 保持磨损细节稳定；不能每帧改变 |
+| `folderDepth` | 0.03–0.4，0.085 | 文件夹内页夹层厚度，场景单位 |
+| `folderOpen` | 0–35，4 | 封面开合角度，**度** |
+
+`paperCurl`（原有 0–3）继续缩放纸面基础和随机卷曲。纸张闭合网格真实厚度 0.006；照片类 0.008；文件夹封面／封底约 0.016。尺寸不是毫米，不要当真实物理单位填入。
+
+原生导出增加 `paperSurface/paperPoint/paperThickness/paperSeed/wearParameters/folderSettings`。`paperSurface` 是稳定纸面／文件夹封面的上包络；`pinWorld` 将纸宿主上的钉位置至少抬到当地表面上方 0.016，不写回 pin.local。自由钉不改变。
+
+```json
+{"format":"xpin-scene/1","items":[
+ {"id":"photo-a","kind":"photo","wear":0.35,"edgeTear":0.65,"stainAmount":0.18,"wearSeed":47},
+ {"id":"folder-b","kind":"folder","folderDepth":0.1,"folderOpen":8,"wear":0.55}
+]}
+```
+
+只修改这些字段的稳定 ID patch 会保留已有变换、机位、时间线和素材。需要完全平整时明确设置 wear=0、edgeTear=0、stainAmount=0、paperCurl=0。

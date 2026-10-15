@@ -205,6 +205,12 @@ export class BoardRenderer {
         o.roughness,
         o.paperCurl,
         o.fiberStrength,
+        o.wear,
+        o.edgeTear,
+        o.stainAmount,
+        o.wearSeed,
+        o.folderDepth,
+        o.folderOpen,
       ]);
       if (this.signatures.get(o.id) !== signature) {
         const old = this.objects.get(o.id);
@@ -232,7 +238,7 @@ export class BoardRenderer {
       if (!g) {
         g = pinMesh(pin.color, this.materials, pin.roughness);
         g.traverse((n) => {
-          n.userData = { id: pin.id, kind: "pin" };
+          n.userData = { ...n.userData, id: pin.id, kind: "pin" };
         });
         this.pins.set(pin.id, g);
         this.scene.add(g);
@@ -240,6 +246,7 @@ export class BoardRenderer {
         g.traverse((n) => {
           if (
             n instanceof T.Mesh &&
+            n.userData.pinPlastic &&
             n.material instanceof T.MeshPhysicalMaterial
           ) {
             n.material.color.set(pin.color);
@@ -263,6 +270,11 @@ export class BoardRenderer {
         host?.width,
         host?.height,
         host?.paperCurl,
+        host?.wear,
+        host?.edgeTear,
+        host?.wearSeed,
+        host?.folderDepth,
+        host?.folderOpen,
       ]);
       let g = this.marks.get(m.id);
       if (!g || g.userData.signature !== signature) {
@@ -419,13 +431,15 @@ export class BoardRenderer {
         if (n instanceof T.Mesh && n.userData.paper)
           deformPaper(
             n,
-            o,
+            n.userData.paperSpec ?? o,
             deform?.type === "peel" ? q : 1,
             deform?.strength ?? 1,
           );
         if (n.userData.clipHandle)
           n.rotation.x =
-            deform?.type === "clamp" ? (1 - q) * 0.85 * deform.strength : 0;
+            deform?.type === "clamp"
+              ? (1 - q) * 0.85 * deform.strength * (n.userData.clipSign ?? 1)
+              : 0;
         if (n.userData.clipJaw)
           n.rotation.x =
             deform?.type === "clamp" ? (1 - q) * 0.65 * deform.strength : 0;
@@ -438,11 +452,16 @@ export class BoardRenderer {
       if (typing) {
         const chars = Math.floor((o.title.length + o.body.length) * q);
         if (g.userData.typed !== chars) {
-          const raw = (g.children[0] as T.Mesh).material;
-          const material = (
-            Array.isArray(raw) ? raw[0] : raw
-          ) as T.MeshStandardMaterial;
-          if (material.map) {
+          let material: T.MeshStandardMaterial | undefined;
+          g.traverse((n) => {
+            if (!(n instanceof T.Mesh) || material) return;
+            const first = Array.isArray(n.material)
+              ? n.material[0]
+              : n.material;
+            if (first instanceof T.MeshStandardMaterial && first.map)
+              material = first;
+          });
+          if (material?.map) {
             material.map.dispose();
             material.map = this.materials.content({
               ...o,

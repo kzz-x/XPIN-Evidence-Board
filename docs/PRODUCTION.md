@@ -1,4 +1,4 @@
-# V5 制作规范：防穿模、时序与摄影机
+# V5.1 制作规范：防穿模、时序与摄影机
 
 Agent 在 Node 中制作数据，不操作浏览器。入口为 `src/authoring.ts`；可直接处理用户的 Project JSON 或编译 SceneBrief。先读源并保留恢复点，按稳定 ID 修改；不要为修穿模重建整个作品。人类操作参见 [使用指南](USER-GUIDE.md)。
 
@@ -22,6 +22,16 @@ if (report.issues.some(i => i.severity === "error")) {
 ```
 
 如果高度不合意，应调整构图、翘曲、覆盖范围或纸张顺序，再检查。`liftToSurface` 不是刚体落体求解器，不负责夹子形体／薄边碰撞。
+
+### 新增纸面质感与文件夹约束
+
+默认纸张是轻度存档：真实撕边、稳定随机卷角与低对比污渍。按景别和叙事选择磨损，不能所有照片都调成破损。用固定 wearSeed 保持重开、Seek 和增量修改一致；需要保护已有美术时保留 seed，不在每次编译时重抽。
+
+文件夹是有封面、页签封底、内页和折脊的立体物件。folderOpen 用度，开角会提高封面边缘；放置上层物件时用 paperSurface / liftToSurface，而不是只看 folder.position.z。夹子与回形针已是实体细化模型，仍没有自动附着父级或完整夹持碰撞约束。
+
+新增物件的界面放置使用真实表面高度采样，原生 compileScene 不擅自改写作者布局。Agent 新建叠放布局后，应按设计的下→上顺序调用 liftToSurface，再运行 audit。它仍是稳定形体采样工具，不能保证动态柔纸或固定件每一帧不穿模。
+
+纸面投影需要真实间距。V5.1 使用接收面深度校正处理柔化 PCF 的斜面自阴影，不能因此允许两张纸相交。技术依据：[Microsoft 的逐样本接收面深度偏差说明](https://learn.microsoft.com/en-us/windows/win32/dxtecharts/cascaded-shadow-maps)。本项目没有集成完整级联阴影系统。
 
 ## 端点与固定件
 

@@ -4,8 +4,32 @@ let installed = false;
 /** Deterministic disk PCF on real shadow depths. No screen-space or baked shadows. */
 export function installShadowFilter() {
   if (installed) return;
-  const chunk = ShaderChunk.shadowmap_pars_fragment;
-  const begin = chunk.indexOf("#if defined( SHADOWMAP_TYPE_PCF )"),
+  // Receiver-plane depth correction follows the PCF technique documented by Microsoft:
+  // https://learn.microsoft.com/en-us/windows/win32/dxtecharts/cascaded-shadow-maps
+  let chunk = ShaderChunk.shadowmap_pars_fragment;
+  chunk = chunk.replace(
+    "float getShadow(",
+    `float xpinShadowTap(sampler2D map, vec3 coord, vec2 offset, vec2 plane, vec2 size) {
+    vec2 sampleUV=(floor((coord.xy+offset)*size)+0.5)/size;
+    return texture2DCompare(map,sampleUV,coord.z+dot(plane,sampleUV-coord.xy));
+  }
+  float getShadow(`,
+  );
+  chunk = chunk.replace(
+    "bool inFrustum =",
+    `
+  #if defined( SHADOWMAP_TYPE_PCF )
+    vec3 dx=dFdx(shadowCoord.xyz), dy=dFdy(shadowCoord.xyz);
+    float determinant=dx.x*dy.y-dx.y*dy.x;
+    vec2 receiverPlane=abs(determinant)>1e-12 ? vec2(dx.z*dy.y-dx.y*dy.z,dx.x*dy.z-dx.z*dy.x)/determinant : vec2(0.0);
+    receiverPlane=clamp(receiverPlane,vec2(-2.0),vec2(2.0));
+  #endif
+  bool inFrustum =`,
+  );
+  const begin = chunk.indexOf(
+      "#if defined( SHADOWMAP_TYPE_PCF )",
+      chunk.indexOf("if ( frustumTest )"),
+    ),
     end = chunk.indexOf("#elif defined( SHADOWMAP_TYPE_PCF_SOFT )", begin);
   if (begin < 0 || end < 0) throw Error("Unsupported Three.js shadow chunk");
   const taps = Array.from({ length: 32 }, (_, i) => {
@@ -13,7 +37,7 @@ export function installShadowFilter() {
       angle = i * 2.399963229728653;
     const x = (radius * Math.cos(angle)).toFixed(7),
       y = (radius * Math.sin(angle)).toFixed(7);
-    return `texture2DCompare(shadowMap, shadowCoord.xy + texelSize * shadowRadius * vec2(${x}, ${y}), shadowCoord.z)`;
+    return `xpinShadowTap(shadowMap,shadowCoord.xyz,texelSize*shadowRadius*vec2(${x},${y}),receiverPlane,shadowMapSize)`;
   });
   ShaderChunk.shadowmap_pars_fragment =
     chunk.slice(0, begin) +

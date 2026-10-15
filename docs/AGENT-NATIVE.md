@@ -2,7 +2,7 @@
 
 目标：Agent 直接用 TypeScript 数据模型、场景编译器和时间线引擎制作可编辑作品。**本指南不要求浏览器会话、页面点击、DOM 选择器或 `window.__XPIN`。** 人类只需打开最终工程，播放检查并决定输出。
 
-适用 Studio V5 / Project version 3；这是仓库内源码 API，不是已发布到 npm 的 SDK 包。字段详见 [协议速查](SCENE-REFERENCE.md)，人类操作见 [USER-GUIDE](USER-GUIDE.md)。
+适用 Studio V5.1 / Project version 3；这是仓库内源码 API，不是已发布到 npm 的 SDK 包。字段详见 [协议速查](SCENE-REFERENCE.md)，人类操作见 [USER-GUIDE](USER-GUIDE.md)。
 
 ## 1. 先拿到正确的源
 

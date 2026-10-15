@@ -1,6 +1,6 @@
 # 从这里开始
 
-适用 Studio V5，工程格式 `version: 3`，Agent 描述格式 `xpin-scene/1`。
+适用 Studio V5.1，工程格式 `version: 3`，Agent 描述格式 `xpin-scene/1`。
 
 | 你想做什么 | 入口 |
 |---|---|
@@ -12,7 +12,7 @@
 
 ## 人类：三步开始
 
-1. 下载仓库 `releases/XPIN-Evidence-Board-Studio-V5.html`，保存为 HTML 后用桌面 Edge / Chrome 打开。GitHub 文件页本身不是工作台。
+1. 下载仓库 `releases/XPIN-Evidence-Board-Studio-V5.1.html`，保存为 HTML 后用桌面 Edge / Chrome 打开。GitHub 文件页本身不是工作台。
 2. 在「午夜档案」里体验，或选「空白调查板」开始；先摆物件，再加图钉／绳／标注，最后编排镜头。
 3. 「保存工程」下载可编辑 JSON；「输出」生成图片或视频。HTML 是软件，JSON 是作品，视频是成片，三者分开保留。
 

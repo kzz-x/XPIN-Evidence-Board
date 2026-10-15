@@ -1,3 +1,4 @@
+import { paperSurface } from "./paper-profile";
 export type V3 = [number, number, number];
 export type Kind =
   | "photo"
@@ -40,6 +41,13 @@ export interface Item extends Transform {
   roughness?: number;
   paperCurl?: number;
   fiberStrength?: number;
+  wear?: number;
+  edgeTear?: number;
+  stainAmount?: number;
+  wearSeed?: number;
+  folderDepth?: number;
+  /** Degrees, unlike Transform.rotation. */
+  folderOpen?: number;
 }
 export interface Pin {
   id: string;
@@ -305,9 +313,13 @@ export function pinWorld(
   transforms?: Map<string, Transform>,
 ): V3 {
   const host = project.items.find((o) => o.id === pin.hostId);
-  return host
-    ? localToWorld(transforms?.get(host.id) ?? host, pin.local)
-    : [...pin.local];
+  const local = [...pin.local] as V3;
+  if (host && !["clip", "pin", "staple", "stamp"].includes(host.kind))
+    local[2] = Math.max(
+      local[2],
+      paperSurface(host, local[0], local[1]) + 0.016,
+    );
+  return host ? localToWorld(transforms?.get(host.id) ?? host, local) : local;
 }
 export const ratio = (aspect: Settings["aspect"]) =>
   ({ "16:9": 16 / 9, "9:16": 9 / 16, "3:4": 3 / 4, "1:1": 1 })[aspect];
@@ -506,6 +518,33 @@ export function validateProject(p: unknown): Project {
       o.scale <= 0
     )
       throw new Error("物件参数无效");
+  for (const o of s.items) {
+    for (const value of [o.wear, o.edgeTear, o.stainAmount])
+      if (
+        value !== undefined &&
+        (!Number.isFinite(value) || value < 0 || value > 1)
+      )
+        throw Error("纸张磨损参数无效");
+    if (
+      o.wearSeed !== undefined &&
+      (!Number.isInteger(o.wearSeed) ||
+        o.wearSeed < 0 ||
+        o.wearSeed > 2147483647)
+    )
+      throw Error("纸张随机种子无效");
+    if (
+      o.folderDepth !== undefined &&
+      (!Number.isFinite(o.folderDepth) ||
+        o.folderDepth < 0.03 ||
+        o.folderDepth > 0.4)
+    )
+      throw Error("文件夹厚度无效");
+    if (
+      o.folderOpen !== undefined &&
+      (!Number.isFinite(o.folderOpen) || o.folderOpen < 0 || o.folderOpen > 35)
+    )
+      throw Error("文件夹开合角度无效");
+  }
   for (const l of s.lights)
     if (
       !vector(l.position) ||

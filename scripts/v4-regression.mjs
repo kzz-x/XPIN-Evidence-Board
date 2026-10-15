@@ -89,7 +89,9 @@ try {
     const audit = await page.evaluate(() => {
       const s = window.__XPIN.studio;
       return s.p.items
-        .filter((o) => !["clip", "pin", "staple", "stamp"].includes(o.kind))
+        .filter(
+          (o) => !["clip", "pin", "staple", "stamp", "folder"].includes(o.kind),
+        )
         .map((o) => {
           const g = s.view.objects.get(o.id),
             geo = g.children[0].geometry,
@@ -107,7 +109,7 @@ try {
         });
     });
     assert.ok(
-      audit.every((x) => x.children === 1 && x.gap < 0.00601 && x.groups === 2),
+      audit.every((x) => x.children === 1 && x.gap < 0.00801 && x.groups === 2),
     );
     await page.evaluate(() => {
       const s = window.__XPIN.studio;
@@ -397,10 +399,13 @@ try {
         return {
           top: paper.getZ(0),
           pin: s.view.pins.get("pin-a").position.z,
-          clip: s.view.objects
-            .get("clip-a")
-            .children.filter((n) => n.userData.clipHandle)
-            .map((n) => n.rotation.x),
+          clip: (() => {
+            const angles = [];
+            s.view.objects.get("clip-a").traverse((n) => {
+              if (n.userData.clipHandle) angles.push(n.rotation.x);
+            });
+            return angles;
+          })(),
           ink: s.view.marks.get("mark-a").children[0].geometry.drawRange.count,
         };
       };

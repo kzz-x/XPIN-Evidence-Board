@@ -1,3 +1,4 @@
+import { agePaper } from "./paper-aging";
 import * as T from "three";
 import type { Item, Settings } from "./model";
 import corkColor from "./assets/Cork003_1K-JPG_Color-optimized.jpg?inline";
@@ -473,6 +474,8 @@ export class Materials {
       g.lineWidth = 1;
       g.strokeRect(2, 2, w - 4, h - 4);
     }
+    if (!["stamp", "clip", "pin", "staple"].includes(o.kind))
+      agePaper(g, o, w, h);
     return texture(c);
   }
   wrap(
@@ -494,6 +497,13 @@ export class Materials {
       } else part += letter;
     }
     g.fillText(part, x, y + row * line);
+  }
+  tapeContent(o: Item) {
+    const { c, g } = canvas(1024, Math.round((1024 * o.height) / o.width));
+    g.fillStyle = o.color;
+    g.fillRect(0, 0, c.width, c.height);
+    agePaper(g, o, c.width, c.height);
+    return texture(c);
   }
   paperMaterial(o: Item) {
     const map = this.content(o);

@@ -159,7 +159,7 @@ export function evaluate(p: Project, time: number): Frame {
     else if (a.type === "peel") offset[2] = amount * 0.12;
     else if (a.type === "clamp" || a.type === "thread") {
       offset[1] = amount * 0.8;
-      offset[2] = amount * 0.18;
+      offset[2] = amount * (a.type === "clamp" ? 0.5 : 0.18);
     } else if (a.type === "settle") offset[2] = amount * 1.7;
     else if (a.type === "stamp") offset[2] = amount * 0.7;
     else if (a.type === "slide" && origin === "local") offset[0] = -2 * amount;
